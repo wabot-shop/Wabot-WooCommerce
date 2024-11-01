@@ -239,7 +239,6 @@ function wabot_get_templates() {
     return $templates;
 }
 
-// Render function for Templates Tab
 function wabot_template_render( $args ) {
     $options = get_option( 'wabot_settings_templates' );
     $key = $args['key'];
@@ -253,11 +252,17 @@ function wabot_template_render( $args ) {
         ?>
         <select name="wabot_settings_templates[wabot_template_<?php echo esc_attr( $key ); ?>]">
             <option value="">Select a Template</option>
-            <?php foreach ( $templates as $template ) : ?>
-                <option value="<?php echo esc_attr( $template['id'] ); ?>" <?php selected( $selected_template, $template['id'] ); ?>>
-                    <?php echo esc_html( $template['name'] ); ?>
+            <?php foreach ( $templates as $template ) : 
+                $template_id = $template['template_id'] ?? '';
+                $template_name = $template['name'] ?? '';
+                if ( $template_id && $template_name ) :
+            ?>
+                <option value="<?php echo esc_attr( $template_id ); ?>" <?php selected( $selected_template, $template_id ); ?>>
+                    <?php echo esc_html( $template_name ); ?>
                 </option>
-            <?php endforeach; ?>
+            <?php 
+                endif;
+            endforeach; ?>
         </select>
         <?php if ( $description ) : ?>
             <p class="description"><?php echo esc_html( $description ); ?></p>
