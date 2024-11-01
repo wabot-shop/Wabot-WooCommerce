@@ -34,7 +34,7 @@ Wabot-WooCommerce is a WooCommerce plugin that integrates Wabot’s WhatsApp mes
    - Once installed, click **Activate** to enable the plugin.
 
 3. **Wabot API Credentials**:
-   - Obtain your `clientId` and `clientSecret` from your Wabot account.
+   - Obtain your `clientId` and `clientSecret` from your Wabot account. Go to Developer Settingd
    - Navigate to **WooCommerce > Settings > Wabot-WooCommerce** and enter your API credentials.
 
 ## Configuration
