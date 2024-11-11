@@ -225,40 +225,57 @@ class Wabot_API {
     }
     
     
-
-    public function send_message( $to, $template_id, $template_params = array() ) {
+    public function send_message( $to, $template_name, $template_params = array() ) {
         // Ensure we have a valid token
         $this->ensure_token();
 
+        ///print_r($template_params); exit;
+    
         if ( empty( $this->token ) ) {
             error_log( 'Wabot API Error: Unable to authenticate.' );
             return false;
         }
-
-        $api_url = 'https://api.wabot.shop/v1/send-message';
-
+    
+        // API endpoint
+        $api_url = 'https://api.wabot.shop/send-message/455428624312178';
+    
+        // Headers for the request
         $headers = array(
             'Content-Type'  => 'application/json',
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => $this->token,
         );
-
+    
+        // Body for the request
         $body = array(
-            'to'         => $to,
-            'templateId' => $template_id,
-            'params'     => $template_params,
+            'to'            => $to, // Validated phone number
+            'templateName'  => $template_name,
+            'receipentName' => isset( $template_params['name'] ) ? $template_params['name'] : '',
         );
-
+    
+        // Make the POST request
         $response = wp_remote_post( $api_url, array(
             'method'  => 'POST',
             'timeout' => 45,
             'headers' => $headers,
             'body'    => json_encode( $body ),
         ) );
-
-        // Handle response and errors...
-
+    
+        // Handle the response
+        if ( is_wp_error( $response ) ) {
+            error_log( 'Wabot API Error: ' . $response->get_error_message() );
+            return false;
+        }
+    
+        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+    
+        if ( isset( $data['error'] ) ) {
+            error_log( 'Wabot API Error: ' . $data['error'] );
+            return false;
+        }
+    
         return $data;
     }
+    
 
     
 }

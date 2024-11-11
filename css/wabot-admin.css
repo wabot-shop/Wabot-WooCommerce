@@ -1,0 +1,82 @@
+/* Modal Background */
+.wabot-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Modal Content */
+.wabot-modal-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 20px;
+    width: 400px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+/* Input Fields */
+.wabot-modal-content label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.wabot-modal-content input,
+.wabot-modal-content textarea {
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+/* Ensure the phone input field is full-width */
+.intl-tel-input {
+    width: 100%;
+    display: block;
+    margin-bottom: 15px;
+}
+.iti.iti--allow-dropdown {
+    width: 100%;
+    display: block;
+    margin-bottom: 15px;
+
+}
+.intl-tel-input input[type="tel"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* Adjust flag dropdown size */
+.intl-tel-input .iti__flag-container {
+    width: 50px; /* Adjust as needed */
+    max-height: none; /* Ensure no overflow */
+}
+
+/* Fix alignment of input field with flag dropdown */
+.intl-tel-input input[type="tel"] {
+    padding-left: 60px; /* Leave space for the flag dropdown */
+}
+
+/* Dropdown list styling */
+.iti__country-list {
+    max-height: 250px; /* Adjust as needed */
+    overflow-y: auto;
+    z-index: 10000; /* Ensure it appears above modal */
+}
+
+/* Ensure the modal content doesn't overlap with dropdown */
+.wabot-modal-content {
+    overflow: visible; /* Prevent hiding dropdown */
+}

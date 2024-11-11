@@ -264,6 +264,9 @@ function wabot_template_render( $args ) {
                 endif;
             endforeach; ?>
         </select>
+        <?php echo "<button type='button' class='button wabot-preview-button' data-key='$key'>Preview</button>"; ?>
+        <?php echo "<button type='button' class='button wabot-test-button' data-key='$key'>Test</button>"; ?>
+
         <?php if ( $description ) : ?>
             <p class="description"><?php echo esc_html( $description ); ?></p>
         <?php endif; ?>
@@ -287,13 +290,28 @@ function wabot_abandonment_time_render( $args ) {
     <?php
 }
 
-// Enqueue Admin Styles (Optional)
-add_action( 'admin_enqueue_scripts', 'wabot_admin_enqueue_scripts' );
-function wabot_admin_enqueue_scripts( $hook ) {
-    if ( 'toplevel_page_wabot-settings' !== $hook ) {
+function wabot_send_message_ajax() {
+    if ( ! isset( $_POST['to'], $_POST['template_name'] ) ) {
+        wp_send_json_error( array( 'message' => 'Invalid parameters.' ) );
         return;
     }
 
-    // Enqueue custom CSS if needed
-    wp_enqueue_style( 'wabot-admin-style', plugin_dir_url( __FILE__ ) . 'css/wabot-admin.css' );
+    // Sanitize inputs
+    $to = sanitize_text_field( $_POST['to'] );
+    $template_name = sanitize_text_field( $_POST['template_name'] );
+    $template_params = isset( $_POST['template_params'] ) ? array_map( 'sanitize_text_field', $_POST['template_params'] ) : array();
+
+    // Call the send_message method of your API class
+    $api_instance = new Wabot_API(); // Replace with your actual API class instantiation
+    $response = $api_instance->send_message( $to, $template_name, $template_params );
+
+    if ( $response ) {
+        wp_send_json_success( array( 'message' => 'Message sent successfully.' ) );
+    } else {
+        wp_send_json_error( array( 'message' => 'Failed to send message.' ) );
+    }
 }
+add_action( 'wp_ajax_wabot_send_message', 'wabot_send_message_ajax' );
+
+
+
