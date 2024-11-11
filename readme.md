@@ -88,7 +88,4 @@ Yes, the plugin dashboard shows recovery metrics for abandoned carts, including 
 
 ## License
 
-
-
-
 This project is licensed under the [MIT License](LICENSE).
