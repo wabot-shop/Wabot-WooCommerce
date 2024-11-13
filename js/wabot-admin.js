@@ -2,7 +2,10 @@ jQuery(document).ready(function ($) {
     // Handle Preview Button click
     $(".wabot-preview-button").on("click", function () {
         const key = $(this).data("key");
-        alert("Preview template for: " + key); // Replace with modal display logic
+        fetchTemplatePreview(key);
+        $("#wabot-template-preview-modal").fadeIn();
+
+       // alert("Preview template for: " + key); // Replace with modal display logic
     });
 
     // Handle Test Button click
@@ -111,4 +114,78 @@ jQuery(document).ready(function ($) {
         });
         
     });
+
+
+    function fetchTemplatePreview(templateName) {
+    
+        $.post(wabotAdmin.ajax_url, {
+            action: "wabot_get_template_preview",
+            template_name: templateName,
+        }).done(function (response) {
+            if (response.success) {
+                renderTemplatePreview(response.data);
+            } else {
+                alert("Failed to load template preview.");
+            }
+        }).fail(function () {
+            alert("Error fetching template preview.");
+        });
+    }
+    
+    function renderTemplatePreview(template) {
+        let previewHtml = `<h3>Template: ${template.name}</h3>`;
+        previewHtml += `
+            <div class="wawrapper">
+            <div class="inner">
+            `;
+        template.components.forEach((component) => {
+            if (component.type === "header") {
+                previewHtml += `
+                    <div class="chat-header">
+                        <span>${component.content}</span>
+                    </div>`;
+            } else if (component.type === "body") {
+                // Replace variables ({{1}}, {{2}}) with placeholders
+                let bodyContent = component.content.replace(/{{\d+}}/g, (match) => {
+                    const varNumber = match.replace(/[{}]/g, "");
+                    return `<span class="variable">[Variable ${varNumber}]</span>`;
+                });
+    
+                // Replace \n with <br> for proper new line rendering
+                bodyContent = bodyContent.replace(/\\n/g, "<br>");
+    
+                previewHtml += `
+                    <div class="chat-body">
+                        <p>${bodyContent}</p>
+                    </div>`;
+            } else if (component.type === "button") {
+                previewHtml += `
+                    <div class="chat-button">
+                        <button>${component.content}</button>
+                    </div>`;
+            }
+        });
+        previewHtml += `
+        </div>
+        </div>
+        `;
+    
+        // Inject the preview HTML into the modal
+        $("#template-preview-container").html(previewHtml);
+    }
+    
+    
+    // Close the modal when the close button is clicked
+    $(document).on("click", "#close-preview-modal", function () {
+        $("#wabot-template-preview-modal").fadeOut();
+    });
+
+    // Optional: Close the modal when clicking outside the modal content
+    $(document).on("click", function (e) {
+        if ($(e.target).is("#wabot-template-preview-modal")) {
+            $("#wabot-template-preview-modal").fadeOut();
+        }
+    });
 });
+
+

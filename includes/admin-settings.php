@@ -266,6 +266,17 @@ function wabot_template_render( $args ) {
         </select>
         <?php echo "<button type='button' class='button wabot-preview-button' data-key='$key'>Preview</button>"; ?>
         <?php echo "<button type='button' class='button wabot-test-button' data-key='$key'>Test</button>"; ?>
+        
+        <div id="wabot-template-preview-modal" class="wabot-modal">
+            <div class="wabot-modal-content">
+            <div class="modal-header">
+            <h2>Template Preview</h2>
+            <button type="button" id="close-preview-modal" class="close-button">×</button>
+        </div>
+            <div id="template-preview-container"></div>
+            </div>
+        </div>
+
 
         <?php if ( $description ) : ?>
             <p class="description"><?php echo esc_html( $description ); ?></p>
@@ -315,3 +326,29 @@ add_action( 'wp_ajax_wabot_send_message', 'wabot_send_message_ajax' );
 
 
 
+function wabot_get_template_preview() {
+    $template_name = isset($_POST['template_name']) ? sanitize_text_field($_POST['template_name']) : '';
+
+    // Simulate fetching template details from the Wabot API
+    $template_data = [
+        'name' => $template_name,
+        'components' => [
+            [
+                'type' => 'header',
+                'content' => 'Finalize account set-up',
+            ],
+            [
+                'type' => 'body',
+                'content' => 'Hi {{1}},\n\nYour new account has been created successfully. \n\nPlease verify {{2}} to complete your profile.',
+            ],
+            [
+                'type' => 'button',
+                'content' => 'Verify account',
+                'url' => 'https://app.wabot.shop/',
+            ],
+        ],
+    ];
+
+    wp_send_json_success($template_data);
+}
+add_action('wp_ajax_wabot_get_template_preview', 'wabot_get_template_preview');

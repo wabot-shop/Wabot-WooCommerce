@@ -275,7 +275,25 @@ class Wabot_API {
     
         return $data;
     }
-    
 
+    public function process_template_components($template) {
+        $variables = [];
     
+        foreach ($template['components'] as $component) {
+            if (isset($component['childComponents'])) {
+                foreach ($component['childComponents'] as $child) {
+                    if ($child['type'] === 'variable') {
+                        $variables[] = [
+                            'name' => $child['text'], // Variable name
+                            'value' => $child['value'], // Default value if any
+                        ];
+                    }
+                }
+            }
+        }
+    
+        return $variables;
+    }
+    
+        
 }

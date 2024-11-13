@@ -74,8 +74,8 @@ function wabot_enqueue_admin_scripts( $hook ) {
     }
 
     // Enqueue modal styling and JavaScript
-    wp_enqueue_style( 'wabot-admin-style', plugin_dir_url( __FILE__ ) . '/css/wabot-admin.css' );
-    wp_enqueue_script( 'wabot-admin-script', plugins_url( '/js/wabot-admin.js', __FILE__ ), array( 'jquery' ), '1.0', true );
+    wp_enqueue_style( 'wabot-admin-style', plugin_dir_url( __FILE__ ) . '/css/wabot-admin.css?v='.time() );
+    wp_enqueue_script( 'wabot-admin-script', plugins_url( '/js/wabot-admin.js?v='.time(), __FILE__ ), array( 'jquery' ), '1.0', true );
 
     // Include intl-tel-input library
     wp_enqueue_style( 'intl-tel-input-style', 'https://cdn.jsdelivr.net/npm/intl-tel-input@18.2.1/build/css/intlTelInput.min.css' );

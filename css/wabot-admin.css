@@ -80,3 +80,133 @@
 .wabot-modal-content {
     overflow: visible; /* Prevent hiding dropdown */
 }
+#wabot-template-preview-modal .wabot-modal-content {
+    max-width: 500px;
+    padding: 20px;
+}
+
+#wabot-template-preview-modal h4 {
+    margin-top: 15px;
+    color: #333;
+}
+
+#wabot-template-preview-modal button {
+    background-color: #0073aa;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#wabot-template-preview-modal button:hover {
+    background-color: #005a8e;
+}
+
+/* Chat Box Container */
+
+.chat-body {
+    border-radius: 10px;
+    margin: 10px 0;
+    display: inline-block;
+    max-width: 80%;
+}
+
+.chat-header{
+
+}
+
+.chat-button {
+
+}
+/* Body Styling */
+.chat-body {
+    color: #333;
+    white-space: pre-wrap; /* Preserve white space and line breaks */
+    word-wrap: break-word; /* Prevent text from overflowing */
+    text-align: left;
+}
+
+/* Button Styling */
+.chat-button button {
+    background-color: #0073aa;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.chat-button button:hover {
+    background-color: #005a8e;
+}
+
+/* Placeholder Variable Styling */
+.variable {
+    color: #ff5722;
+    font-weight: bold;
+}
+
+/* Modal Header Styling */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+/* Close Button Styling */
+.close-button {
+    background: none;
+    border: none;
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    cursor: pointer;
+}
+
+.close-button:hover {
+    color: #0073aa;
+}
+
+
+.wawrapper {
+    border: 1px solid #cecece;
+    display: flex; /* Enable flexbox */
+    justify-content: center; /* Horizontally center the div */
+    align-items: center; /* Vertically center the div */
+   padding:20px;
+    background-color: #f4f4f4; /* Optional, for better visibility */
+}
+
+.inner {
+    display: flex; /* Flexbox for inner layout */
+    flex-direction: column; /* Stack items vertically */
+    text-align: left; /* Align text to the left */
+    background-color: #fff; /* Optional, for better visibility */
+    padding: 20px; /* Optional, for spacing */
+  }
+
+  .inner {
+    position: relative; /* Needed for the tail */
+    padding: 15px 20px; /* Padding for the text */
+    border-radius: 10px; /* Rounded corners */
+    max-width: 300px; /* Optional, for a consistent width */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional, for shadow effect */
+    text-align: left; /* Align text inside */
+  }
+  
+  .inner::before {
+    content: ""; /* Create the tail */
+    position: absolute;
+    top: 0; /* Position it at the top */
+    left: -17px; /* Slightly to the left of the chat box */
+    width: 0;
+    height: 0;
+    border-width: 10px;
+    border-style: solid;
+    border-color: transparent #fff transparent transparent; /* Match chat bubble color */
+  }
