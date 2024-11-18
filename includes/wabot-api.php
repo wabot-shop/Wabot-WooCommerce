@@ -175,7 +175,7 @@ class Wabot_API {
             return false;
         }
     
-        $api_url = 'https://api.wabot.shop/get-templates';
+        $api_url = 'https://api.wabot.shop/templates/get-templates';
         
         $headers = array(
             'Authorization' => $this->token,

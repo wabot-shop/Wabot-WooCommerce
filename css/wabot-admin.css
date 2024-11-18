@@ -91,17 +91,9 @@
 }
 
 #wabot-template-preview-modal button {
-    background-color: #0073aa;
-    color: #fff;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
     cursor: pointer;
 }
 
-#wabot-template-preview-modal button:hover {
-    background-color: #005a8e;
-}
 
 /* Chat Box Container */
 

@@ -239,6 +239,162 @@ function wabot_get_templates() {
     return $templates;
 }
 
+function wabot_get_single_template($template) {
+    $templatesArray = wabot_get_templates();
+
+    // Check if decoding was successful
+    if ($templatesArray === null) {
+        die('Error decoding JSON');
+    }
+
+    if ($template === null || $template == "") {
+        die('Invalid Template');
+    }
+
+    foreach ($templatesArray as $templates) {
+       
+        if ($templates['name'] == $template) {
+            $desiredTemplate = $templates;
+            break;
+        }
+    }
+
+    if ($desiredTemplate !== null) {
+        return $desiredTemplate;
+    }
+    else {
+        return "";
+    }
+
+    
+
+}
+
+function wabot_convertToDesiredFormat($originalArray) {
+    // Initialize the new array structure
+    $newArray = [
+        'name' => $originalArray['name'],
+        'components' => [],
+    ];
+
+    // Loop through each component in the original array
+    foreach ($originalArray['components'] as $component) {
+        $newComponent = [];
+
+        // Process components based on their type
+        switch ($component['type']) {
+            case 'header':
+                $content = '';
+                $contentType = '';
+
+                // Loop through child components for headers
+                foreach ($component['childComponents'] as $child) {
+                    switch ($child['type']) {
+                        case 'text':
+                            $content = $child['text'];
+                            $contentType = 'text';
+                            break;
+                        case 'video':
+                            $content = $child['video_link'];
+                            $contentType = 'video';
+                            break;
+                        case 'document':
+                            $content = $child['document_link'];
+                            $contentType = 'document';
+                            break;
+                        case 'image':
+                            $content = $child['image_link'];
+                            $contentType = 'image';
+                            break;
+                    }
+                }
+
+                $newComponent = [
+                    'type' => 'header',
+                    'content_type' => $contentType,
+                    'content' => $content,
+                ];
+                break;
+
+            case 'body':
+                $bodyContent = '';
+                $variables = [];
+
+                // Loop through child components for body content and variables
+                foreach ($component['childComponents'] as $child) {
+                    if ($child['type'] === 'text') {
+                        $bodyContent = $child['text'];
+                    }
+                    if ($child['type'] === 'variable') {
+                        $variables[] = [
+                            'text' => $child['text'],
+                            'value' => $child['value'],
+                        ];
+                    }
+                }
+
+                $newComponent = [
+                    'type' => 'body',
+                    'content' => $bodyContent,
+                    'variables' => $variables,
+                ];
+
+                // Add variables if present
+                if (!empty($variables)) {
+                    $newComponent['variables'] = $variables;
+                }
+                break;
+
+            case 'button':
+                // Placeholder for buttons processing logic
+                foreach ($component['childComponents'] as $child) {
+                   
+                    if ($child['type'] === 'button') {
+                        $button = [
+                            'text' => $child['text'],
+                            'type' => $child['type'],
+                            'value' => $child['value'],
+                            'url'   => $child['url']
+                        ];
+                    }
+                }        
+                
+                $newComponent['button'] = [
+                    'type' => 'button',
+                    'button_type' => $button['text'],
+                    'content' => $button['value'],
+                    'action' => $button['url'],
+                ];
+                break;
+
+
+                case 'carousel':
+                    $carousel = '';
+                    $variables = [];
+                    $newComponent = [
+                        'type' => 'carousel',
+                        'content' => $component['carouselCards'],
+                    ];
+    
+                    // Add variables if present
+                    if (!empty($variables)) {
+                        $newComponent['variables'] = $variables;
+                    }
+                    break;
+
+            
+        }
+
+        // Add processed component to the new array if it exists
+        if (!empty($newComponent)) {
+            $newArray['components'][] = $newComponent;
+        }
+    }
+
+    return $newArray;
+}
+
+
 function wabot_template_render( $args ) {
     $options = get_option( 'wabot_settings_templates' );
     $key = $args['key'];
@@ -257,15 +413,15 @@ function wabot_template_render( $args ) {
                 $template_name = $template['name'] ?? '';
                 if ( $template_id && $template_name ) :
             ?>
-                <option value="<?php echo esc_attr( $template_id ); ?>" <?php selected( $selected_template, $template_id ); ?>>
+                <option value="<?php echo esc_attr( $template_name ); ?>" <?php selected( $selected_template, $template_name ); ?>>
                     <?php echo esc_html( $template_name ); ?>
                 </option>
             <?php 
                 endif;
             endforeach; ?>
         </select>
-        <?php echo "<button type='button' class='button wabot-preview-button' data-key='$key'>Preview</button>"; ?>
-        <?php echo "<button type='button' class='button wabot-test-button' data-key='$key'>Test</button>"; ?>
+        <?php echo "<button type='button' class='button wabot-preview-button' data-template='$key' data-key='$selected_template'>Preview</button>"; ?>
+        <?php echo "<button type='button' class='button wabot-test-button' data-template='$key'  data-key='$selected_template'>Test</button>"; ?>
         
         <div id="wabot-template-preview-modal" class="wabot-modal">
             <div class="wabot-modal-content">
@@ -328,9 +484,13 @@ add_action( 'wp_ajax_wabot_send_message', 'wabot_send_message_ajax' );
 
 function wabot_get_template_preview() {
     $template_name = isset($_POST['template_name']) ? sanitize_text_field($_POST['template_name']) : '';
+    $template = wabot_get_single_template($template_name);
+   
+    $template_data = wabot_convertToDesiredFormat($template);
 
+    //print_r($template_data);
     // Simulate fetching template details from the Wabot API
-    $template_data = [
+    $template_data1 = [
         'name' => $template_name,
         'components' => [
             [

@@ -16,13 +16,16 @@ jQuery(document).ready(function ($) {
         const modalHtml = `
             <div id="wabot-test-modal" class="wabot-modal">
                 <div class="wabot-modal-content">
-                    <h2>Test Template: ${key}</h2>
+                 <div class="modal-header">
+                   <h2>Test Template: ${key}</h2>
+                    <button type="button" id="close-modal" class="close-button">×</button>
+                    </div>
+                    
                     <label for="test-recipient">Recipient Phone Number:</label>
                     <input type="tel" id="test-recipient" class="intl-tel-input" name="test-recipient" placeholder="Enter phone number">
                     <label for="test-variable">Variable Data:</label>
                     <textarea id="test-variable" name="test-variable" placeholder="Enter dynamic variables"></textarea>
                     <button type="button" id="send-test-message" class="button-primary">Send</button>
-                    <button type="button" id="close-modal" class="button">Close</button>
                 </div>
             </div>
         `;
