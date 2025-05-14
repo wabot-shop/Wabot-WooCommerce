@@ -11,13 +11,19 @@ function wabot_send_new_user_message( $user_id ) {
     if ( $phone ) {
         $wabot = new Wabot_API();
         $options = get_option( 'wabot_settings' );
+        $templates_options = get_option( 'wabot_settings_templates' );
         $template_id = $options['wabot_template_new_user'] ?? '';
+        $template_enabled = isset( $templates_options['wabot_template_new_user_enabled'] ) ? 
+                          $templates_options['wabot_template_new_user_enabled'] : '1';
+        
+        // Only send if template is enabled
+        if ( $template_id && $template_enabled == '1' ) {
+            $variables = array(
+                'name' => $user->first_name,
+            );
 
-        $variables = array(
-            'name' => $user->first_name,
-        );
-
-        $wabot->send_message( $phone, $template_id, $variables );
+            $wabot->send_message( $phone, $template_id, $variables );
+        }
     }
 }
 
@@ -28,14 +34,20 @@ function wabot_send_password_reset_message( $user, $new_pass ) {
     if ( $phone ) {
         $wabot = new Wabot_API();
         $options = get_option( 'wabot_settings' );
+        $templates_options = get_option( 'wabot_settings_templates' );
         $template_id = $options['wabot_template_password_reset'] ?? '';
+        $template_enabled = isset( $templates_options['wabot_template_password_reset_enabled'] ) ? 
+                          $templates_options['wabot_template_password_reset_enabled'] : '1';
+        
+        // Only send if template is enabled
+        if ( $template_id && $template_enabled == '1' ) {
+            $variables = array(
+                'name'     => $user->first_name,
+                'new_pass' => $new_pass,
+            );
 
-        $variables = array(
-            'name'     => $user->first_name,
-            'new_pass' => $new_pass,
-        );
-
-        $wabot->send_message( $phone, $template_id, $variables );
+            $wabot->send_message( $phone, $template_id, $variables );
+        }
     }
 }
 
@@ -52,14 +64,20 @@ function wabot_send_new_order_message( $order_id ) {
     if ( $phone ) {
         $wabot = new Wabot_API();
         $options = get_option( 'wabot_settings' );
+        $templates_options = get_option( 'wabot_settings_templates' );
         $template_id = $options['wabot_template_new_order'] ?? '';
+        $template_enabled = isset( $templates_options['wabot_template_new_order_enabled'] ) ? 
+                          $templates_options['wabot_template_new_order_enabled'] : '1';
+        
+        // Only send if template is enabled
+        if ( $template_id && $template_enabled == '1' ) {
+            $variables = array(
+                'order_id' => $order->get_order_number(),
+                'total'    => $order->get_total(),
+            );
 
-        $variables = array(
-            'order_id' => $order->get_order_number(),
-            'total'    => $order->get_total(),
-        );
-
-        $wabot->send_message( $phone, $template_id, $variables );
+            $wabot->send_message( $phone, $template_id, $variables );
+        }
     }
 }
 
@@ -70,13 +88,19 @@ function wabot_send_order_status_message( $order_id, $old_status, $new_status, $
     if ( $phone ) {
         $wabot = new Wabot_API();
         $options = get_option( 'wabot_settings' );
+        $templates_options = get_option( 'wabot_settings_templates' );
         $template_id = $options['wabot_template_order_status'] ?? '';
+        $template_enabled = isset( $templates_options['wabot_template_order_status_enabled'] ) ? 
+                          $templates_options['wabot_template_order_status_enabled'] : '1';
+        
+        // Only send if template is enabled
+        if ( $template_id && $template_enabled == '1' ) {
+            $variables = array(
+                'order_id' => $order->get_order_number(),
+                'status'   => $new_status,
+            );
 
-        $variables = array(
-            'order_id' => $order->get_order_number(),
-            'status'   => $new_status,
-        );
-
-        $wabot->send_message( $phone, $template_id, $variables );
+            $wabot->send_message( $phone, $template_id, $variables );
+        }
     }
 }
