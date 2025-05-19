@@ -1,0 +1,52 @@
+.iti {
+    width: 100%;
+    display: block;
+    margin-bottom: 15px;
+}
+
+.iti__flag-container {
+    z-index: 10;
+}
+
+.iti input[type="tel"] {
+    width: 100%;
+    padding: 10px 12px 10px 52px !important;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #333;
+    height: auto;
+}
+
+.iti input[type="tel"]:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+    outline: none;
+}
+
+.iti--separate-dial-code .iti__selected-flag {
+    background-color: #f5f7fa;
+    border-radius: 3px 0 0 3px;
+}
+
+/* Error state */
+.iti input[type="tel"].error {
+    border-color: #e53e3e;
+}
+
+.phone-error-message {
+    color: #e53e3e;
+    font-size: 13px;
+    margin-top: 5px;
+    display: none;
+}
+
+/* WooCommerce specific styles */
+.woocommerce-checkout .iti,
+.woocommerce-account .iti {
+    margin-bottom: 0;
+}
+
+.woocommerce form .form-row .iti input[type="tel"] {
+    margin: 0;
+} 

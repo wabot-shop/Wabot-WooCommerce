@@ -36,6 +36,18 @@ jQuery(document).ready(function ($) {
             $templateActions.addClass('disabled');
             $actionButtons.addClass('disabled');
         }
+        
+        // Highlight the save button to indicate unsaved changes
+        const $saveButton = $(this).closest('form').find('.wabot-button[type="submit"]');
+        $saveButton.css({
+            'background-color': '#f80',
+            'box-shadow': '0 0 5px rgba(255, 136, 0, 0.5)'
+        });
+        
+        // Add a small reminder to save changes
+        if (!$('.save-reminder').length) {
+            $saveButton.after('<span class="save-reminder" style="margin-left: 10px; color: #f80; font-style: italic;">Don\'t forget to save your changes!</span>');
+        }
     });
     
     // Debug Templates button
@@ -79,6 +91,8 @@ jQuery(document).ready(function ($) {
                     console.log('Processed Templates:', response.data.processed_templates);
                     console.log('Active Phone ID:', response.data.active_phone_id);
                     console.log('API Endpoint:', response.data.api_endpoint);
+                    console.log('Template Enabled States:', response.data.template_enabled_states);
+                    console.log('All Template Settings:', response.data.all_template_settings);
                     console.groupEnd();
                     
                     // Show notification
@@ -185,22 +199,21 @@ jQuery(document).ready(function ($) {
             $(`#template_${currentTemplateKey}_value`).val(selectedTemplateName);
             
             // Update the template trigger text
-            $(`.template-select-trigger[data-key="${currentTemplateKey}"] .template-select-trigger-text`)
+            const $trigger = $(`.template-select-trigger[data-key="${currentTemplateKey}"]`);
+            $trigger.find('.template-select-trigger-text')
                 .text(selectedTemplateName)
                 .removeClass('placeholder');
             
-            // Add preview and test buttons if they don't exist
-            const $actionsContainer = $(`.template-select-trigger[data-key="${currentTemplateKey}"]`).siblings('.template-actions');
-            
-            if ($actionsContainer.length === 0) {
-                const $newActions = $(`<div class="template-actions" style="margin-top: 10px;"></div>`);
-                $newActions.append(`<button type='button' class='wabot-preview-button wabot-btn-icon' data-template='${currentTemplateKey}' data-key='${selectedTemplateName}'><span class='dashicons dashicons-visibility'></span> Preview</button>`);
-                $newActions.append(`<button type='button' class='wabot-test-button wabot-btn-icon' data-template='${currentTemplateKey}' data-key='${selectedTemplateName}'><span class='dashicons dashicons-email-alt'></span> Test</button>`);
-                $(`.template-select-trigger[data-key="${currentTemplateKey}"]`).after($newActions);
-            } else {
-                $actionsContainer.find('.wabot-preview-button').data('key', selectedTemplateName);
-                $actionsContainer.find('.wabot-test-button').data('key', selectedTemplateName);
-            }
+            // Get template data and update configuration
+            $.post(wabotAdmin.ajax_url, {
+                action: "wabot_get_template_preview",
+                template_name: selectedTemplateName,
+                nonce: wabotAdmin.nonce
+            }).done(function(response) {
+                if (response.success && response.data) {
+                    updateTemplateConfiguration(response.data, $trigger.closest('.wabot-form-group'));
+                }
+            });
             
             // Close modal
             $('#template-gallery-modal').removeClass('active');
@@ -405,7 +418,8 @@ jQuery(document).ready(function ($) {
         
         // Fetch template details to get variables
         $.post(wabotAdmin.ajax_url, {
-            action: "wabot_get_template_preview",
+            action: 'wabot_get_template_preview',
+            nonce: wabotAdmin.nonce,
             template_name: key,
         }).done(function (response) {
             // Remove loading overlay
@@ -466,24 +480,6 @@ jQuery(document).ready(function ($) {
                                         default: button.url !== '#' ? button.url : ''
                                     });
                                 }
-                                if (button.type === 'PHONE_NUMBER') {
-                                    ctaParams.push({
-                                        label: 'CTA Phone',
-                                        key: 'cta_phone',
-                                        type: 'tel',
-                                        placeholder: 'Enter phone number',
-                                        default: ''
-                                    });
-                                }
-                            });
-                        } else if (component.url) {
-                            // Simple URL button
-                            ctaParams.push({
-                                label: 'CTA Link',
-                                key: 'cta_link',
-                                type: 'url',
-                                placeholder: 'Enter CTA URL',
-                                default: component.url !== '#' ? component.url : ''
                             });
                         }
                     }
@@ -496,19 +492,15 @@ jQuery(document).ready(function ($) {
                 variables.forEach(variable => {
                     variableFieldsHtml += `
                         <div class="wabot-form-group">
-                            <label for="test-variable-${variable.number}">${variable.label}:</label>
-                            <input type="${variable.type}" id="test-variable-${variable.number}" 
+                            <label for="test-var-${variable.number}">${variable.label}:</label>
+                            <input type="text" id="test-var-${variable.number}" 
                                 class="test-variable-input" data-var-number="${variable.number}" 
-                                placeholder="Enter value for {{${variable.number}}}" />
+                                placeholder="Enter value for ${variable.label}">
                         </div>
                     `;
                 });
             } else {
-                variableFieldsHtml = `
-                    <div class="wabot-empty-state" style="padding: 15px; text-align: center; background: #f5f7fa; border-radius: 4px;">
-                        This template has no variables
-                    </div>
-                `;
+                variableFieldsHtml = '<p>No variables found in this template.</p>';
             }
             
             // Create CTA fields HTML
@@ -539,7 +531,7 @@ jQuery(document).ready(function ($) {
                 </div>
             ` : '';
 
-            // Create and display modal dynamically
+            // Create the modal HTML
             const modalHtml = `
                 <div id="wabot-test-modal" class="wabot-modal">
                     <div class="wabot-modal-content">
@@ -1029,6 +1021,664 @@ jQuery(document).ready(function ($) {
     $(document).on('remove', '#wabot-test-modal', function() {
         $(document).off('click', '#close-test-modal');
         $(document).off('click', '#send-test-message');
+    });
+
+    // Email template enable/disable toggle functionality
+    $(document).on('change', '[id^=email_template_][id$=_enabled]', function() {
+        const isEnabled = $(this).prop('checked');
+        const key = $(this).attr('id').replace('email_template_', '').replace('_enabled', '');
+        const $label = $(this).closest('.template-toggle-container').find('.wabot-toggle-label');
+        const $editorContainer = $(this).closest('.wabot-form-group').find('.email-template-editor');
+        const $testButton = $(this).closest('.wabot-form-group').find('.wabot-test-email-button');
+        
+        // Update toggle label
+        $label.text(isEnabled ? 'Enabled' : 'Disabled');
+        
+        // Toggle disabled class on the template editor and action buttons
+        if (isEnabled) {
+            $editorContainer.removeClass('disabled');
+            $testButton.removeClass('disabled');
+        } else {
+            $editorContainer.addClass('disabled');
+            $testButton.addClass('disabled');
+        }
+        
+        // Highlight the save button to indicate unsaved changes
+        const $saveButton = $(this).closest('form').find('.wabot-button[type="submit"]');
+        $saveButton.css({
+            'background-color': '#f80',
+            'box-shadow': '0 0 5px rgba(255, 136, 0, 0.5)'
+        });
+        
+        // Add a small reminder to save changes
+        if (!$('.save-reminder').length) {
+            $saveButton.after('<span class="save-reminder" style="margin-left: 10px; color: #f80; font-style: italic;">Don\'t forget to save your changes!</span>');
+        }
+    });
+    
+    // Initialize the email test modal
+    if ($('#email-test-modal').length === 0) {
+        $('body').append(`
+            <div id="email-test-modal" class="wabot-modal">
+                <div class="wabot-modal-content">
+                    <div class="modal-header">
+                        <h2>Test Email Template</h2>
+                        <button type="button" id="close-email-test-modal" class="close-button">×</button>
+                    </div>
+                    <div class="wabot-form-body" style="padding: 20px;">
+                        <div class="wabot-form-group">
+                            <label for="test-email-recipient">Email Address:</label>
+                            <input type="email" id="test-email-recipient" class="regular-text" placeholder="Enter recipient email address">
+                        </div>
+                        <div id="email-test-variables-container" style="margin-top: 20px;">
+                            <!-- Dynamic variables will be inserted here -->
+                        </div>
+                        <div class="wabot-form-actions" style="margin-top: 20px; text-align: right;">
+                            <button type="button" id="send-test-email" class="wabot-button">
+                                <span class="dashicons dashicons-email-alt" style="margin-right: 5px;"></span> Send Test Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+    
+    // Test Email Button click event
+    $(document).on("click", ".wabot-test-email-button", function() {
+        const templateKey = $(this).data('template');
+        const templateSubject = $(`#wabot_email_template_${templateKey}_subject`).val();
+        const templateContent = $(`#wabot_email_template_${templateKey}`).val();
+        
+        // Extract variables from the template content using regex for {variable_name} format
+        const variables = [];
+        const variableRegex = /\{([^}]+)\}/g;
+        let match;
+        
+        while ((match = variableRegex.exec(templateContent)) !== null) {
+            const variableName = match[1];
+            if (!variables.includes(variableName)) {
+                variables.push(variableName);
+            }
+        }
+        
+        // Also check subject line for variables
+        while ((match = variableRegex.exec(templateSubject)) !== null) {
+            const variableName = match[1];
+            if (!variables.includes(variableName)) {
+                variables.push(variableName);
+            }
+        }
+        
+        // Generate form fields for each variable
+        let variableFields = '';
+        if (variables.length > 0) {
+            variableFields += '<h3 style="margin-top: 0;">Template Variables</h3>';
+            
+            variables.forEach(variable => {
+                let defaultValue = '';
+                
+                // Set some sensible default values based on variable name
+                if (variable === 'customer_name') defaultValue = 'John Doe';
+                if (variable === 'order_id') defaultValue = '12345';
+                if (variable === 'order_total') defaultValue = '$99.99';
+                if (variable === 'order_status') defaultValue = 'Processing';
+                if (variable === 'site_name') defaultValue = window.location.hostname;
+                if (variable === 'site_url') defaultValue = window.location.origin;
+                if (variable === 'recovery_link') defaultValue = window.location.origin + '/cart/';
+                if (variable === 'coupon_code') defaultValue = 'TESTCOUPON10';
+                
+                variableFields += `
+                    <div class="wabot-form-group">
+                        <label for="email-var-${variable}">{${variable}}:</label>
+                        <input type="text" id="email-var-${variable}" class="email-variable-input" 
+                            data-var-name="${variable}" value="${defaultValue}" style="width: 100%;">
+                    </div>
+                `;
+            });
+        } else {
+            variableFields = '<p>No variables found in this template.</p>';
+        }
+        
+        // Update the modal with the variables
+        $('#email-test-variables-container').html(variableFields);
+        
+        // Store the current template key for the send function
+        $('#send-test-email').data('template-key', templateKey);
+        
+        // Show the modal
+        $('#email-test-modal').addClass('active');
+        $('body').addClass('modal-open');
+    });
+    
+    // Close email test modal
+    $(document).on('click', '#close-email-test-modal', function() {
+        $('#email-test-modal').removeClass('active');
+        $('body').removeClass('modal-open');
+    });
+    
+    // Send test email button click
+    $(document).on('click', '#send-test-email', function() {
+        const $button = $(this);
+        const templateKey = $button.data('template-key');
+        const recipient = $('#test-email-recipient').val();
+        
+        // Validate email address
+        if (!recipient || !isValidEmail(recipient)) {
+            showNotification('Please enter a valid email address', 'error');
+            return;
+        }
+        
+        // Collect variable values
+        const variables = {};
+        $('.email-variable-input').each(function() {
+            const varName = $(this).data('var-name');
+            const varValue = $(this).val();
+            variables[varName] = varValue;
+        });
+        
+        // Show loading state
+        const originalText = $button.html();
+        $button.html('<span class="dashicons dashicons-update" style="margin-right: 5px; animation: spin 1s linear infinite;"></span> Sending...').prop('disabled', true);
+        
+        // Make AJAX request to send test email
+        $.ajax({
+            url: wabotAdmin.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'wabot_send_test_email',
+                nonce: wabotAdmin.nonce,
+                template_key: templateKey,
+                recipient: recipient,
+                variables: variables
+            },
+            success: function(response) {
+                // Restore button
+                $button.html(originalText).prop('disabled', false);
+                
+                if (response.success) {
+                    showNotification('Test email sent successfully!', 'success');
+                    // Close modal
+                    $('#email-test-modal').removeClass('active');
+                    $('body').removeClass('modal-open');
+                } else {
+                    showNotification(response.data.message || 'Failed to send test email', 'error');
+                }
+            },
+            error: function() {
+                // Restore button
+                $button.html(originalText).prop('disabled', false);
+                showNotification('Server error. Please try again.', 'error');
+            }
+        });
+    });
+    
+    // Helper function to validate email address
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    // Email preview functionality
+    $(document).on('click', '.wabot-preview-email-button', function() {
+        const templateKey = $(this).data('template');
+        const templateSubject = $(`#wabot_email_template_${templateKey}_subject`).val();
+        const templateContent = $(`#wabot_email_template_${templateKey}`).val();
+        
+        // Extract variables from the template content using regex for {variable_name} format
+        const variables = [];
+        const variableRegex = /\{([^}]+)\}/g;
+        let match;
+        
+        while ((match = variableRegex.exec(templateContent)) !== null) {
+            const variableName = match[1];
+            if (!variables.includes(variableName)) {
+                variables.push(variableName);
+            }
+        }
+        
+        // Also check subject line for variables
+        while ((match = variableRegex.exec(templateSubject)) !== null) {
+            const variableName = match[1];
+            if (!variables.includes(variableName)) {
+                variables.push(variableName);
+            }
+        }
+        
+        // Generate form fields for each variable
+        let variableFields = '';
+        if (variables.length > 0) {
+            variableFields += '<h3 style="margin-top: 0;">Template Variables</h3>';
+            
+            variables.forEach(variable => {
+                let defaultValue = '';
+                
+                // Set some sensible default values based on variable name
+                if (variable === 'customer_name') defaultValue = 'John Doe';
+                if (variable === 'order_id') defaultValue = '12345';
+                if (variable === 'order_total') defaultValue = '$99.99';
+                if (variable === 'order_status') defaultValue = 'Processing';
+                if (variable === 'site_name') defaultValue = window.location.hostname;
+                if (variable === 'site_url') defaultValue = window.location.origin;
+                if (variable === 'recovery_link') defaultValue = window.location.origin + '/cart/';
+                if (variable === 'coupon_code') defaultValue = 'TESTCOUPON10';
+                
+                variableFields += `
+                    <div class="wabot-form-group">
+                        <label for="preview-var-${variable}">{${variable}}:</label>
+                        <input type="text" id="preview-var-${variable}" class="preview-variable-input" 
+                            data-var-name="${variable}" value="${defaultValue}" style="width: 100%;">
+                    </div>
+                `;
+            });
+        } else {
+            variableFields = '<p>No variables found in this template.</p>';
+        }
+        
+        // Update the modal with the variables
+        $('#email-preview-variables-container').html(variableFields);
+        
+        // Store the current template key for the preview function
+        $('#refresh-email-preview').data('template-key', templateKey);
+        
+        // Show initial preview
+        updateEmailPreview(templateKey);
+        
+        // Show the modal
+        $('#email-preview-modal').addClass('active');
+        $('body').addClass('modal-open');
+    });
+
+    // Close email preview modal
+    $(document).on('click', '#close-email-preview-modal', function() {
+        $('#email-preview-modal').removeClass('active');
+        $('body').removeClass('modal-open');
+    });
+
+    // Refresh preview button click
+    $(document).on('click', '#refresh-email-preview', function() {
+        const templateKey = $(this).data('template-key');
+        updateEmailPreview(templateKey);
+    });
+
+    // Update preview when variables change
+    $(document).on('input', '.preview-variable-input', function() {
+        const templateKey = $('#refresh-email-preview').data('template-key');
+        updateEmailPreview(templateKey);
+    });
+
+    function updateEmailPreview(templateKey) {
+        let templateSubject = $(`#wabot_email_template_${templateKey}_subject`).val();
+        let templateContent = $(`#wabot_email_template_${templateKey}`).val();
+        
+        // Collect variable values
+        $('.preview-variable-input').each(function() {
+            const varName = $(this).data('var-name');
+            const varValue = $(this).val();
+            const variableRegex = new RegExp(`\\{${varName}\\}`, 'g');
+            
+            templateSubject = templateSubject.replace(variableRegex, varValue);
+            templateContent = templateContent.replace(variableRegex, varValue);
+        });
+        
+        // Update preview
+        $('#email-preview-subject').html(`<strong>Subject:</strong> ${templateSubject}`);
+        $('#email-preview-content').html(templateContent);
+    }
+
+    // Function to update template configuration sections
+    function updateTemplateConfiguration(templateData, container) {
+        // Clear existing configuration
+        container.find('.template-configuration').empty();
+
+        if (!templateData || !templateData.components) {
+            container.find('.template-configuration').html(`
+                <div class="wabot-empty-state">
+                    <p>No template configuration available</p>
+                </div>
+            `);
+            return;
+        }
+
+        // Create configuration container
+        let configHtml = '<div class="template-configuration">';
+
+        // Variables Section
+        const bodyComponents = templateData.components.filter(c => c.type === 'body');
+        let variables = [];
+        let variableCount = 0;
+
+        bodyComponents.forEach(component => {
+            if (component.content) {
+                // Extract {{1}}, {{2}}, etc.
+                const matches = component.content.match(/{{\d+}}/g) || [];
+                
+                matches.forEach(match => {
+                    const varNumber = match.replace(/[{}]/g, "");
+                    if (!variables.some(v => v.number === varNumber)) {
+                        let varLabel = `Variable ${varNumber}`;
+                        
+                        // Try to get better label from template metadata
+                        if (component.variables) {
+                            const templateVar = component.variables.find(v => 
+                                v.text.includes(varNumber) || v.text === `Custom${varNumber}`);
+                            if (templateVar) {
+                                varLabel = templateVar.text;
+                            }
+                        }
+                        
+                        variables.push({
+                            number: varNumber,
+                            label: varLabel,
+                            type: 'text'
+                        });
+                        variableCount++;
+                    }
+                });
+            }
+        });
+
+        if (variableCount > 0) {
+            configHtml += `
+                <div class="config-section variables-section">
+                    <h3 class="section-title">
+                        Variables Configuration
+                        <span class="component-count">${variableCount}</span>
+                    </h3>
+                    <div class="variables-config">
+                        <table class="wabot-config-table">
+                            <thead>
+                                <tr>
+                                    <th>Variable</th>
+                                    <th>Default Value</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            variables.forEach(variable => {
+                configHtml += `
+                    <tr>
+                        <td><code>{{${variable.number}}}</code><br><small>${variable.label}</small></td>
+                        <td>
+                            <input type="text" class="variable-input" 
+                                name="template_variable_${variable.number}" 
+                                placeholder="Enter default value">
+                            <div class="variable-picker">
+                                <select class="insert-variable">
+                                    <option value="">Insert system variable...</option>
+                                    <option value="{customer_name}">Customer Name</option>
+                                    <option value="{order_id}">Order ID</option>
+                                    <option value="{order_total}">Order Total</option>
+                                    <option value="{order_status}">Order Status</option>
+                                    <option value="{site_name}">Site Name</option>
+                                    <option value="{site_url}">Site URL</option>
+                                </select>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="variable-description">
+                                Enter the default value for this variable. You can also select from system variables.
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            configHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Buttons/CTA Section
+        const buttonComponents = templateData.components.filter(c => c.type === 'button');
+        let buttonCount = 0;
+
+        if (buttonComponents.length > 0) {
+            configHtml += `
+                <div class="config-section buttons-section">
+                    <h3 class="section-title">
+                        Button Configuration
+                        <span class="component-count">${buttonComponents.length}</span>
+                    </h3>
+                    <div class="buttons-config">
+                        <table class="wabot-config-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Configuration</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            buttonComponents.forEach((button, index) => {
+                const buttonType = button.buttons && button.buttons[0] ? button.buttons[0].type : 'URL';
+                buttonCount++;
+
+                configHtml += `
+                    <tr>
+                        <td>${buttonType}</td>
+                        <td>
+                            ${buttonType === 'URL' ? `
+                                <input type="url" class="button-input" 
+                                    name="template_button_${index}_url" 
+                                    placeholder="Enter default URL">
+                                <div class="variable-picker">
+                                    <select class="insert-variable">
+                                        <option value="">Insert dynamic URL...</option>
+                                        <option value="{cart_url}">Cart URL</option>
+                                        <option value="{checkout_url}">Checkout URL</option>
+                                        <option value="{account_url}">Account URL</option>
+                                    </select>
+                                </div>
+                            ` : `
+                                <input type="tel" class="button-input" 
+                                    name="template_button_${index}_phone" 
+                                    placeholder="Enter default phone number">
+                            `}
+                        </td>
+                        <td>
+                            <span class="variable-description">
+                                ${buttonType === 'URL' ? 
+                                    'Enter the default URL for this button. You can also select from dynamic URLs.' :
+                                    'Enter the default phone number for this button.'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            configHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        configHtml += '</div>';
+
+        // Add the configuration to the container
+        container.find('.template-configuration').replaceWith(configHtml);
+
+        // Initialize variable pickers
+        initializeVariablePickers(container);
+    }
+
+    // Initialize variable pickers functionality
+    function initializeVariablePickers(container) {
+        container.find('.insert-variable').on('change', function() {
+            const value = $(this).val();
+            if (!value) return;
+            
+            // Save the selected value
+            $(this).find(`option[value="${value}"]`).prop('selected', true);
+            
+            // If this is a default value field, update it with the system variable
+            const input = $(this).closest('td').next('td').find('input[type="text"], input[type="url"]');
+            if (input.length) {
+                const systemVars = {
+                    'customer_name': 'John Doe',
+                    'order_id': '12345',
+                    'order_total': '$99.99',
+                    'order_status': 'Processing',
+                    'site_name': window.location.hostname,
+                    'site_url': window.location.origin,
+                    'recovery_link': window.location.origin + '/cart/',
+                    'coupon_code': 'WELCOME10'
+                };
+                
+                input.val(systemVars[value] || '');
+            }
+            
+            // Highlight the save button
+            const $saveButton = $(this).closest('form').find('.wabot-button[type="submit"]');
+            $saveButton.css({
+                'background-color': '#f80',
+                'box-shadow': '0 0 5px rgba(255, 136, 0, 0.5)'
+            });
+            
+            // Add save reminder if not already present
+            if (!$('.save-reminder').length) {
+                $saveButton.after('<span class="save-reminder" style="margin-left: 10px; color: #f80; font-style: italic;">Don\'t forget to save your changes!</span>');
+            }
+        });
+    }
+
+    // Handle template selection
+    $('.template-select-trigger').on('click', function() {
+        const container = $(this).closest('.wabot-form-group');
+        const templateKey = $(this).data('key');
+        
+        // Show template gallery modal
+        showTemplateGallery(templateKey, function(selectedTemplate) {
+            if (selectedTemplate) {
+                // Update template configuration
+                updateTemplateConfiguration(selectedTemplate, container);
+            }
+        });
+    });
+
+    // Initialize existing templates
+    $('.template-select-trigger').each(function() {
+        const container = $(this).closest('.wabot-form-group');
+        const templateName = container.find('input[type="hidden"]').val();
+        
+        if (templateName) {
+            // Get template data and update configuration
+            $.ajax({
+                url: wabotAdmin.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'wabot_get_template_preview',
+                    template_name: templateName,
+                    nonce: wabotAdmin.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        updateTemplateConfiguration(response.data, container);
+                    }
+                }
+            });
+        }
+    });
+
+    // Variable picker functionality
+    $('.insert-variable').on('change', function() {
+        const value = $(this).val();
+        if (!value) return;
+        
+        // Save the selected value
+        $(this).find(`option[value="${value}"]`).prop('selected', true);
+        
+        // If this is a default value field, update it with the system variable
+        const input = $(this).closest('td').next('td').find('input[type="text"], input[type="url"]');
+        if (input.length) {
+            const systemVars = {
+                'customer_name': 'John Doe',
+                'order_id': '12345',
+                'order_total': '$99.99',
+                'order_status': 'Processing',
+                'site_name': window.location.hostname,
+                'site_url': window.location.origin,
+                'recovery_link': window.location.origin + '/cart/',
+                'coupon_code': 'WELCOME10'
+            };
+            
+            input.val(systemVars[value] || '');
+        }
+        
+        // Highlight the save button
+        const $saveButton = $(this).closest('form').find('.wabot-button[type="submit"]');
+        $saveButton.css({
+            'background-color': '#f80',
+            'box-shadow': '0 0 5px rgba(255, 136, 0, 0.5)'
+        });
+        
+        // Add save reminder if not already present
+        if (!$('.save-reminder').length) {
+            $saveButton.after('<span class="save-reminder" style="margin-left: 10px; color: #f80; font-style: italic;">Don\'t forget to save your changes!</span>');
+        }
+    });
+
+    // Handle template enable/disable toggle
+    $('input[id^="template_"][id$="_enabled"]').on('change', function() {
+        const container = $(this).closest('.wabot-form-group');
+        const isEnabled = $(this).prop('checked');
+        
+        container.find('.template-select-trigger').toggleClass('disabled', !isEnabled);
+        container.find('.template-configuration').toggleClass('disabled', !isEnabled);
+        container.find('.template-actions').toggleClass('disabled', !isEnabled);
+        container.find('.wabot-btn-icon').toggleClass('disabled', !isEnabled);
+    });
+
+    // Clear Template Cache button
+    $(document).on('click', '#clear-template-cache-btn', function() {
+        const $button = $(this);
+        const originalText = $button.html();
+        $button.html('<span class="dashicons dashicons-update" style="margin-right: 5px; animation: spin 1s linear infinite;"></span> Clearing...');
+        $button.prop('disabled', true);
+        
+        // Add spin animation if not already defined
+        if (!document.getElementById('spin-animation')) {
+            $('head').append(`
+                <style id="spin-animation">
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            `);
+        }
+
+        $.ajax({
+            url: wabotAdmin.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'wabot_clear_template_cache',
+                nonce: wabotAdmin.nonce
+            },
+            success: function(response) {
+                $button.html(originalText);
+                $button.prop('disabled', false);
+                if (response.success) {
+                    showNotification('Template cache cleared!', 'success');
+                } else {
+                    showNotification('Failed to clear template cache.', 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                $button.html(originalText);
+                $button.prop('disabled', false);
+                showNotification('AJAX error clearing cache.', 'error');
+            }
+        });
     });
 });
 

@@ -301,31 +301,14 @@ function wabot_log_email( $to, $subject, $body ) {
     $table_name = $wpdb->prefix . 'wabot_email_log';
 
     $wpdb->insert( $table_name, array(
-        'recipient' => $to,
-        'subject'   => $subject,
-        'body'      => $body,
-        'timestamp' => current_time( 'mysql' ),
+        'email_to' => $to,
+        'template_key' => 'abandoned_cart',
+        'subject' => $subject,
+        'variables' => '',
+        'status' => 'sent',
+        'sent_at' => current_time('mysql'),
+        'error_message' => ''
     ) );
-}
-
-// Create email log table
-register_activation_hook( __FILE__, 'wabot_create_email_log_table' );
-function wabot_create_email_log_table() {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'wabot_email_log';
-    $charset_collate = $wpdb->get_charset_collate();
-
-    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
-        id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-        recipient varchar(100) NOT NULL,
-        subject varchar(255) NOT NULL,
-        body longtext NOT NULL,
-        timestamp datetime NOT NULL,
-        PRIMARY KEY (id)
-    ) $charset_collate;";
-
-    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-    dbDelta( $sql );
 }
 
 // Admin Dashboard for Abandoned Carts

@@ -59,12 +59,16 @@ function wabot_settings_init() {
     );
 
     // Templates Tab
-    register_setting( 'wabot_settings_templates_group', 'wabot_settings_templates' );
+    register_setting( 
+        'wabot_settings_templates_group', 
+        'wabot_settings_templates', 
+        'wabot_sanitize_template_settings'
+    );
 
     add_settings_section(
         'wabot_templates_section',
         'WhatsApp Templates',
-        null,
+        'wabot_templates_section_callback',
         'wabot-settings-templates'
     );
 
@@ -72,22 +76,27 @@ function wabot_settings_init() {
         'new_user'       => array(
             'label'       => 'New User Registration',
             'description' => 'Select the WhatsApp template to send when a new user registers.',
+            'variables'   => array('customer_name', 'site_name', 'site_url'),
         ),
         'password_reset' => array(
             'label'       => 'Password Reset',
             'description' => 'Select the WhatsApp template to send when a user resets their password.',
+            'variables'   => array('customer_name', 'site_name', 'site_url'),
         ),
         'new_order'      => array(
             'label'       => 'New Order',
             'description' => 'Select the WhatsApp template to send when a new order is placed.',
+            'variables'   => array('customer_name', 'order_id', 'order_total', 'order_status', 'site_name', 'site_url'),
         ),
         'order_status'   => array(
             'label'       => 'Order Status Update',
             'description' => 'Select the WhatsApp template to send when an order status is updated.',
+            'variables'   => array('customer_name', 'order_id', 'order_total', 'order_status', 'site_name', 'site_url'),
         ),
         'abandoned_cart' => array(
             'label'       => 'Abandoned Cart',
             'description' => 'Select the WhatsApp template to send for abandoned cart recovery.',
+            'variables'   => array('customer_name', 'site_name', 'site_url', 'recovery_link', 'coupon_code'),
         ),
     );
 
@@ -101,6 +110,7 @@ function wabot_settings_init() {
             array(
                 'key'         => $key,
                 'description' => $data['description'],
+                'variables'   => $data['variables'],
             )
         );
     }
@@ -113,6 +123,17 @@ function wabot_settings_init() {
         'Other Settings',
         null,
         'wabot-settings-other'
+    );
+
+    add_settings_field(
+        'wabot_phone_field_enabled',
+        'Phone Number Field',
+        'wabot_phone_field_enabled_render',
+        'wabot-settings-other',
+        'wabot_other_settings_section',
+        array(
+            'description' => 'Enable phone number field in registration and user profile forms.',
+        )
     );
 
     add_settings_field(
@@ -147,7 +168,56 @@ function wabot_settings_init() {
             )
         );
     
-    
+    // Email Settings Tab
+    register_setting( 
+        'wabot_settings_email_group', 
+        'wabot_settings_email', 
+        'wabot_sanitize_email_settings'
+    );
+
+    add_settings_section(
+        'wabot_email_section',
+        'Email Templates',
+        'wabot_email_section_callback',
+        'wabot-settings-email'
+    );
+
+    $email_templates = array(
+        'new_user'       => array(
+            'label'       => 'New User Registration',
+            'description' => 'Email template to send when a new user registers.',
+        ),
+        'password_reset' => array(
+            'label'       => 'Password Reset',
+            'description' => 'Email template to send when a user resets their password.',
+        ),
+        'new_order'      => array(
+            'label'       => 'New Order',
+            'description' => 'Email template to send when a new order is placed.',
+        ),
+        'order_status'   => array(
+            'label'       => 'Order Status Update',
+            'description' => 'Email template to send when an order status is updated.',
+        ),
+        'abandoned_cart' => array(
+            'label'       => 'Abandoned Cart',
+            'description' => 'Email template to send for abandoned cart recovery.',
+        ),
+    );
+
+    foreach ( $email_templates as $key => $data ) {
+        add_settings_field(
+            "wabot_email_template_$key",
+            $data['label'],
+            'wabot_email_template_render',
+            'wabot-settings-email',
+            'wabot_email_section',
+            array(
+                'key'         => $key,
+                'description' => $data['description'],
+            )
+        );
+    }
 
 }
 
@@ -298,6 +368,7 @@ function wabot_settings_page() {
             <a href="?page=wabot-settings&tab=credentials" class="wabot-nav-tab nav-tab <?php echo $tab == 'credentials' ? 'nav-tab-active' : ''; ?>">Credentials</a>
             <a href="?page=wabot-settings&tab=profile" class="wabot-nav-tab nav-tab <?php echo $tab == 'profile' ? 'nav-tab-active' : ''; ?>">Profile</a>
             <a href="?page=wabot-settings&tab=templates" class="wabot-nav-tab nav-tab <?php echo $tab == 'templates' ? 'nav-tab-active' : ''; ?>">Templates</a>
+            <a href="?page=wabot-settings&tab=email_settings" class="wabot-nav-tab nav-tab <?php echo $tab == 'email_settings' ? 'nav-tab-active' : ''; ?>">Email Settings</a>
             <a href="?page=wabot-settings&tab=other_settings" class="wabot-nav-tab nav-tab <?php echo $tab == 'other_settings' ? 'nav-tab-active' : ''; ?>">Settings</a>
         </h2>
 
@@ -340,6 +411,15 @@ function wabot_settings_page() {
                     echo '<div class="wabot-form-header"><h2>WhatsApp Templates</h2></div>';
                     echo '<div class="wabot-form-body">';
                     do_settings_sections( 'wabot-settings-templates' );
+                    echo '</div></div>';
+                    
+                } elseif ( $tab == 'email_settings' ) {
+                    settings_fields( 'wabot_settings_email_group' );
+                    
+                    echo '<div class="wabot-form-section">';
+                    echo '<div class="wabot-form-header"><h2>Email Templates</h2></div>';
+                    echo '<div class="wabot-form-body">';
+                    do_settings_sections( 'wabot-settings-email' );
                     echo '</div></div>';
                     
                 } elseif ( $tab == 'other_settings' ) {
@@ -722,44 +802,158 @@ function wabot_template_render( $args ) {
     $key = $args['key'];
     $selected_template = $options["wabot_template_$key"] ?? '';
     $description = isset( $args['description'] ) ? $args['description'] : '';
-    $is_enabled = isset($options["wabot_template_{$key}_enabled"]) ? $options["wabot_template_{$key}_enabled"] : '1'; // Default to enabled
+    $is_enabled = isset($options["wabot_template_{$key}_enabled"]) ? $options["wabot_template_{$key}_enabled"] : '1';
+
+    // Get saved variable values and button parameters
+    $variable_values = isset($options["wabot_template_{$key}_variables"]) ? $options["wabot_template_{$key}_variables"] : array();
+    $button_params = isset($options["wabot_template_{$key}_buttons"]) ? $options["wabot_template_{$key}_buttons"] : array();
+    $variable_mappings = isset($options["wabot_template_{$key}_mapping"]) ? $options["wabot_template_{$key}_mapping"] : array();
 
     // Get templates
     $templates = wabot_get_templates();
 
     echo '<div class="wabot-form-group">';
-    if ( ! empty( $templates ) ) {
-        // Get the selected template name for display
-        $selected_template_name = '';
-        foreach ( $templates as $template ) {
-            $template_name = $template['name'] ?? '';
-            if ( $template_name === $selected_template ) {
-                $selected_template_name = $template_name;
-                break;
+    
+    // Create template selector button
+    echo '<div class="template-select-trigger' . ($is_enabled != '1' ? ' disabled' : '') . '" data-key="' . esc_attr( $key ) . '">';
+    echo '<span class="template-select-trigger-text ' . (empty($selected_template) ? 'placeholder' : '') . '">' . 
+        (empty($selected_template) ? 'Select a Template' : esc_html($selected_template)) . 
+        '</span>';
+    echo '<span class="dashicons dashicons-portfolio"></span>';
+    echo '</div>';
+    echo '<br/>';
+    // Hidden input to store the selected template
+    echo '<input type="hidden" name="wabot_settings_templates[wabot_template_' . esc_attr( $key ) . ']" id="template_' . esc_attr( $key ) . '_value" value="' . esc_attr( $selected_template ) . '">';
+    
+    // Add toggle switch for enabling/disabling the template
+    echo '<div class="template-header">';
+    echo '<div class="template-toggle-container">';
+    echo '<label class="wabot-toggle-switch">';
+    echo '<input type="hidden" name="wabot_settings_templates[wabot_template_' . esc_attr( $key ) . '_enabled]" value="0">';
+    echo '<input type="checkbox" name="wabot_settings_templates[wabot_template_' . esc_attr( $key ) . '_enabled]" id="template_' . esc_attr( $key ) . '_enabled" value="1" ' . checked('1', $is_enabled, false) . '>';
+    echo '<span class="wabot-toggle-slider"></span>';
+    echo '</label>';
+    echo '<label for="template_' . esc_attr( $key ) . '_enabled" class="wabot-toggle-label">' . ($is_enabled == '1' ? 'Enabled' : 'Disabled') . '</label>';
+    echo '</div>';
+    echo '</div>';
+
+    if ($templates) {
+        if (!empty($selected_template)) {
+            $template_data = wabot_get_single_template($selected_template);
+            if ($template_data) {
+                // Convert template to desired format
+                $formatted_template = wabot_convertToDesiredFormat($template_data);
+                
+                // Variables Section
+                $body_components = array_filter($formatted_template['components'], function($c) {
+                    return $c['type'] === 'body';
+                });
+                
+                if (!empty($body_components)) {
+                    foreach ($body_components as $component) {
+                        if (isset($component['variables'])) {
+                            echo '<div class="template-variables' . ($is_enabled != '1' ? ' disabled' : '') . '">';
+                            echo '<p class="variables-title">Template Variables:</p>';
+                            echo '<div class="variables-config">';
+                            
+                            // Variable configuration table
+                            echo '<table class="wabot-variables-table">';
+                            echo '<thead>';
+                            echo '<tr>';
+                            echo '<th>Template Variable</th>';
+                            echo '<th>Map to System Variable</th>';
+                            echo '<th>Default Value</th>';
+                            echo '</tr>';
+                            echo '</thead>';
+                            echo '<tbody>';
+                            
+                            foreach ($component['variables'] as $var_key => $variable) {
+                                $var_value = isset($variable_values[$var_key]) ? $variable_values[$var_key] : '';
+                                $var_mapping = isset($variable_mappings[$var_key]) ? $variable_mappings[$var_key] : '';
+                                
+                                echo '<tr>';
+                                echo '<td>' . esc_html($variable['text']) . '</td>';
+                                echo '<td>';
+                                echo '<select class="insert-variable" name="wabot_settings_templates[wabot_template_' . esc_attr($key) . '_mapping][' . esc_attr($var_key) . ']">';
+                                echo '<option value="">Select Variable</option>';
+                                echo '<option value="customer_name"' . selected($var_mapping, 'customer_name', false) . '>Customer Name</option>';
+                                echo '<option value="order_id"' . selected($var_mapping, 'order_id', false) . '>Order ID</option>';
+                                echo '<option value="order_total"' . selected($var_mapping, 'order_total', false) . '>Order Total</option>';
+                                echo '<option value="order_status"' . selected($var_mapping, 'order_status', false) . '>Order Status</option>';
+                                echo '<option value="site_name"' . selected($var_mapping, 'site_name', false) . '>Site Name</option>';
+                                echo '<option value="site_url"' . selected($var_mapping, 'site_url', false) . '>Site URL</option>';
+                                echo '<option value="recovery_link"' . selected($var_mapping, 'recovery_link', false) . '>Recovery Link</option>';
+                                echo '<option value="coupon_code"' . selected($var_mapping, 'coupon_code', false) . '>Coupon Code</option>';
+                                echo '</select>';
+                                echo '</td>';
+                                echo '<td>';
+                                echo '<input type="text" 
+                                    name="wabot_settings_templates[wabot_template_' . esc_attr($key) . '_variables][' . esc_attr($var_key) . ']" 
+                                    value="' . esc_attr($var_value) . '" 
+                                    class="regular-text variable-input" 
+                                    placeholder="Enter default value">';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                            
+                            echo '</tbody>';
+                            echo '</table>';
+                            
+                            echo '</div>'; // Close variables-config
+                            echo '</div>'; // Close template-variables
+                        }
+                    }
+                }
+
+                // Buttons Section
+                $button_components = array_filter($formatted_template['components'], function($c) {
+                    return $c['type'] === 'button';
+                });
+                
+                if (!empty($button_components)) {
+                    echo '<div class="template-buttons' . ($is_enabled != '1' ? ' disabled' : '') . '">';
+                    echo '<p class="variables-title">Button Parameters:</p>';
+                    echo '<div class="buttons-config">';
+                    
+                    // Button configuration table
+                    echo '<table class="wabot-variables-table">';
+                    echo '<thead>';
+                    echo '<tr>';
+                    echo '<th>Button Text</th>';
+                    echo '<th>Type</th>';
+                    echo '<th>URL/Value</th>';
+                    echo '</tr>';
+                    echo '</thead>';
+                    echo '<tbody>';
+                    
+                    foreach ($button_components as $button_key => $button) {
+                        if (isset($button['buttons']) && is_array($button['buttons'])) {
+                            foreach ($button['buttons'] as $btn_key => $btn) {
+                                $btn_value = isset($button_params["{$button_key}_{$btn_key}"]) ? $button_params["{$button_key}_{$btn_key}"] : '';
+                                
+                                echo '<tr>';
+                                echo '<td>' . esc_html($btn['text']) . '</td>';
+                                echo '<td>' . esc_html($btn['type']) . '</td>';
+                                echo '<td>';
+                                echo '<input type="' . ($btn['type'] === 'url' ? 'url' : 'text') . '" 
+                                    name="wabot_settings_templates[wabot_template_' . esc_attr($key) . '_buttons][' . esc_attr("{$button_key}_{$btn_key}") . ']" 
+                                    value="' . esc_attr($btn_value) . '" 
+                                    class="regular-text button-input" 
+                                    placeholder="Enter ' . ($btn['type'] === 'url' ? 'URL' : 'value') . '">';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
+                        }
+                    }
+                    
+                    echo '</tbody>';
+                    echo '</table>';
+                    
+                    echo '</div>'; // Close buttons-config
+                    echo '</div>'; // Close template-buttons
+                }
             }
         }
-        
-        // Create hidden input to store the selected template
-        echo '<input type="hidden" name="wabot_settings_templates[wabot_template_' . esc_attr( $key ) . ']" id="template_' . esc_attr( $key ) . '_value" value="' . esc_attr( $selected_template ) . '">';
-        
-        // Add toggle switch for enabling/disabling the template
-        echo '<div class="template-header">';
-        echo '<div class="template-toggle-container">';
-        echo '<label class="wabot-toggle-switch">';
-        echo '<input type="checkbox" name="wabot_settings_templates[wabot_template_' . esc_attr( $key ) . '_enabled]" id="template_' . esc_attr( $key ) . '_enabled" value="1" ' . checked('1', $is_enabled, false) . '>';
-        echo '<span class="wabot-toggle-slider"></span>';
-        echo '</label>';
-        echo '<label for="template_' . esc_attr( $key ) . '_enabled" class="wabot-toggle-label">' . ($is_enabled == '1' ? 'Enabled' : 'Disabled') . '</label>';
-        echo '</div>';
-        
-        // Create template selector button
-        echo '<div class="template-select-trigger' . ($is_enabled != '1' ? ' disabled' : '') . '" data-key="' . esc_attr( $key ) . '">';
-        echo '<span class="template-select-trigger-text ' . (empty($selected_template) ? 'placeholder' : '') . '">' . 
-            (empty($selected_template_name) ? 'Select a Template' : esc_html($selected_template_name)) . 
-            '</span>';
-        echo '<span class="dashicons dashicons-portfolio"></span>';
-        echo '</div>';
-        echo '</div>'; // Close template-header
         
         // Add preview and test buttons if template is selected
         if (!empty($selected_template)) {
@@ -779,7 +973,79 @@ function wabot_template_render( $args ) {
     echo '</div>';
 }
 
+/**
+ * Get description for template variables
+ */
+function wabot_get_variable_description($variable, $template_key) {
+    $descriptions = array(
+        'customer_name' => 'The name of the customer',
+        'order_id' => 'The unique order ID/number',
+        'order_total' => 'The total amount of the order',
+        'order_status' => 'Current status of the order',
+        'site_name' => 'Your website name',
+        'site_url' => 'Your website URL',
+        'recovery_link' => 'Link to recover abandoned cart',
+        'coupon_code' => 'Generated coupon code for discount'
+    );
+
+    // Add template-specific descriptions
+    $template_specific = array(
+        'new_user' => array(
+            'customer_name' => 'Name of the newly registered user',
+            'site_name' => 'Your website name for welcome message',
+            'site_url' => 'URL for account access'
+        ),
+        'password_reset' => array(
+            'customer_name' => 'Name of the user resetting password',
+            'site_name' => 'Your website name for confirmation',
+            'site_url' => 'URL to access account after reset'
+        ),
+        'new_order' => array(
+            'customer_name' => 'Name of the customer who placed the order',
+            'order_id' => 'The new order number',
+            'order_total' => 'Total amount of the new order',
+            'order_status' => 'Initial status of the order'
+        ),
+        'order_status' => array(
+            'customer_name' => 'Name of the order\'s customer',
+            'order_id' => 'The order being updated',
+            'order_status' => 'New status of the order',
+            'order_total' => 'Total amount of the order'
+        ),
+        'abandoned_cart' => array(
+            'customer_name' => 'Name of the customer with abandoned cart',
+            'recovery_link' => 'Link to restore the abandoned cart',
+            'coupon_code' => 'Special discount code for cart recovery'
+        )
+    );
+
+    // Return template-specific description if available, otherwise return general description
+    if (isset($template_specific[$template_key][$variable])) {
+        return $template_specific[$template_key][$variable];
+    }
+
+    return $descriptions[$variable] ?? 'Variable for template customization';
+}
+
 // Render functions for Other Settings Tab
+function wabot_phone_field_enabled_render($args) {
+    $options = get_option('wabot_settings_other', array());
+    $is_enabled = isset($options['wabot_phone_field_enabled']) ? $options['wabot_phone_field_enabled'] : '1'; // Default to enabled
+    $description = isset($args['description']) ? $args['description'] : '';
+    ?>
+    <div class="wabot-form-group">
+        <label class="wabot-toggle-switch">
+            <input type="hidden" name="wabot_settings_other[wabot_phone_field_enabled]" value="0">
+            <input type="checkbox" name="wabot_settings_other[wabot_phone_field_enabled]" value="1" <?php checked('1', $is_enabled); ?>>
+            <span class="wabot-toggle-slider"></span>
+        </label>
+        <?php if ($description) : ?>
+            <p class="wabot-form-description"><?php echo esc_html($description); ?></p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
 function wabot_abandonment_time_render( $args ) {
     $options = get_option( 'wabot_settings_other' );
     $description = isset( $args['description'] ) ? $args['description'] : '';
@@ -1025,6 +1291,18 @@ function wabot_debug_templates() {
         }
     }
     
+    // Get template settings including enable/disable states
+    $template_settings = get_option('wabot_settings_templates', array());
+    $enabled_states = array();
+    
+    // Extract enabled states for each template
+    foreach ($template_settings as $key => $value) {
+        if (strpos($key, '_enabled') !== false) {
+            $template_key = str_replace('wabot_template_', '', str_replace('_enabled', '', $key));
+            $enabled_states[$template_key] = $value === '1' ? 'Enabled' : 'Disabled';
+        }
+    }
+    
     // Get active phone data
     $profile_settings = get_option('wabot_settings_profile', array());
     $phone_id = !empty($profile_settings['active_phone']) ? $profile_settings['active_phone'] : '';
@@ -1034,8 +1312,317 @@ function wabot_debug_templates() {
         'processed_templates' => $processed_templates,
         'active_phone_id' => $phone_id,
         'api_endpoint' => 'https://api.wabot.shop/send-message/' . $phone_id,
+        'template_enabled_states' => $enabled_states,
+        'all_template_settings' => $template_settings
     ];
     
     wp_send_json_success($debug_data);
 }
 add_action('wp_ajax_wabot_debug_templates', 'wabot_debug_templates');
+
+// Add this function to sanitize template settings and ensure enable/disable toggles are properly saved
+function wabot_sanitize_template_settings($input) {
+    // Get existing settings
+    $output = get_option('wabot_settings_templates', array());
+    
+    // Update with new values
+    if (is_array($input)) {
+        foreach ($input as $key => $value) {
+            // Check if this is an enabled toggle
+            if (strpos($key, '_enabled') !== false) {
+                // Convert to boolean then to string 1/0
+                $output[$key] = ((bool) $value) ? '1' : '0';
+            }
+            // Handle template variables
+            else if (strpos($key, '_variables') !== false) {
+                if (is_array($value)) {
+                    $output[$key] = array_map('sanitize_text_field', $value);
+                }
+            }
+            // Handle template mappings
+            else if (strpos($key, '_mapping') !== false) {
+                if (is_array($value)) {
+                    $output[$key] = array_map('sanitize_text_field', $value);
+                }
+            }
+            // Handle button parameters
+            else if (strpos($key, '_buttons') !== false) {
+                if (is_array($value)) {
+                    $output[$key] = array_map('sanitize_text_field', $value);
+                }
+            }
+            // For other settings, sanitize as text
+            else {
+                $output[$key] = sanitize_text_field($value);
+            }
+        }
+    }
+    
+    // Debug log the settings being saved
+    error_log('Saving template settings: ' . json_encode($output));
+    
+    return $output;
+}
+
+// Section callback for email settings
+function wabot_email_section_callback() {
+    echo '<p>Configure your email templates here. You can use the following variables in your templates:</p>';
+    echo '<ul style="list-style-type: disc; margin-left: 20px;">';
+    echo '<li><code>{customer_name}</code> - Customer\'s name</li>';
+    echo '<li><code>{order_id}</code> - Order ID/number</li>';
+    echo '<li><code>{order_total}</code> - Total order amount</li>';
+    echo '<li><code>{order_status}</code> - Current order status</li>';
+    echo '<li><code>{site_name}</code> - Your website name</li>';
+    echo '<li><code>{site_url}</code> - Your website URL</li>';
+    echo '<li><code>{recovery_link}</code> - For abandoned cart emails</li>';
+    echo '<li><code>{coupon_code}</code> - Coupon code (if applicable)</li>';
+    echo '</ul>';
+}
+
+// Render function for email templates
+function wabot_email_template_render( $args ) {
+    $options = get_option( 'wabot_settings_email' );
+    $key = $args['key'];
+    $template_content = $options["wabot_email_template_$key"] ?? wabot_get_default_email_template($key);
+    $description = isset( $args['description'] ) ? $args['description'] : '';
+    $is_enabled = isset($options["wabot_email_template_{$key}_enabled"]) ? $options["wabot_email_template_{$key}_enabled"] : '0'; // Default to disabled
+
+    echo '<div class="wabot-form-group wabot-email-template">';
+    
+    // Add toggle switch for enabling/disabling the template
+    echo '<div class="template-header" style="margin-bottom: 15px;">';
+    echo '<div class="template-toggle-container">';
+    echo '<label class="wabot-toggle-switch">';
+    echo '<input type="hidden" name="wabot_settings_email[wabot_email_template_' . esc_attr( $key ) . '_enabled]" value="0">';
+    echo '<input type="checkbox" name="wabot_settings_email[wabot_email_template_' . esc_attr( $key ) . '_enabled]" id="email_template_' . esc_attr( $key ) . '_enabled" value="1" ' . checked('1', $is_enabled, false) . '>';
+    echo '<span class="wabot-toggle-slider"></span>';
+    echo '</label>';
+    echo '<label for="email_template_' . esc_attr( $key ) . '_enabled" class="wabot-toggle-label">' . ($is_enabled == '1' ? 'Enabled' : 'Disabled') . '</label>';
+    echo '</div>';
+    
+    // Add title field for email
+    echo '<div class="email-subject-container" style="flex-grow: 1; padding-left: 20px;">';
+    echo '<label for="wabot_email_template_' . esc_attr( $key ) . '_subject" style="display: block; margin-bottom: 5px;">Email Subject:</label>';
+    echo '<input type="text" name="wabot_settings_email[wabot_email_template_' . esc_attr( $key ) . '_subject]" id="wabot_email_template_' . esc_attr( $key ) . '_subject" value="' . esc_attr( $options["wabot_email_template_{$key}_subject"] ?? wabot_get_default_email_subject($key) ) . '" style="width: 100%;">';
+    echo '</div>';
+    echo '</div>'; // Close template-header
+    
+    // Add content textarea
+    echo '<div class="email-template-editor' . ($is_enabled != '1' ? ' disabled' : '') . '">';
+    echo '<textarea name="wabot_settings_email[wabot_email_template_' . esc_attr( $key ) . ']" id="wabot_email_template_' . esc_attr( $key ) . '" rows="15" style="width: 100%;">' . esc_textarea( $template_content ) . '</textarea>';
+    echo '</div>';
+    
+    // Add preview and test buttons
+    echo '<div class="template-actions' . ($is_enabled != '1' ? ' disabled' : '') . '" style="margin-top: 10px;">'; 
+    echo "<button type='button' class='wabot-preview-email-button wabot-btn-icon" . ($is_enabled != '1' ? ' disabled' : '') . "' data-template='$key'><span class='dashicons dashicons-visibility'></span> Preview</button>";
+    echo "<button type='button' class='wabot-test-email-button wabot-btn-icon" . ($is_enabled != '1' ? ' disabled' : '') . "' data-template='$key'><span class='dashicons dashicons-email-alt'></span> Test Email</button>";
+    echo '</div>';
+    
+    // Add description
+    if ( $description ) : 
+        echo '<p class="wabot-form-description">' . esc_html( $description ) . '</p>';
+    endif;
+    
+    echo '</div>';
+}
+
+// Sanitize email settings
+function wabot_sanitize_email_settings($input) {
+    // Get existing settings
+    $output = get_option('wabot_settings_email', array());
+    
+    // Update with new values
+    if (is_array($input)) {
+        foreach ($input as $key => $value) {
+            // Check if this is an enabled toggle
+            if (strpos($key, '_enabled') !== false) {
+                // Convert to boolean then to string 1/0
+                $output[$key] = ((bool) $value) ? '1' : '0';
+            } 
+            // Check if this is a subject field
+            elseif (strpos($key, '_subject') !== false) {
+                $output[$key] = sanitize_text_field($value);
+            }
+            // HTML content in templates
+            else {
+                $output[$key] = wp_kses_post($value);
+            }
+        }
+    }
+    
+    // Debug log the settings being saved
+    error_log('Saving email template settings: ' . json_encode($output));
+    
+    return $output;
+}
+
+// Get default email templates
+function wabot_get_default_email_template($key) {
+    $templates = [
+        'new_user' => '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+    <div style="background-color: #f8f8f8; padding: 20px; text-align: center;">
+        <h1 style="color: #0073aa; margin: 0;">Welcome to {site_name}!</h1>
+    </div>
+    <div style="padding: 20px;">
+        <p>Hello {customer_name},</p>
+        <p>Thank you for creating an account with us. Your account has been successfully created.</p>
+        <p>You can now log in and access your account dashboard, update your profile, and manage your orders.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{site_url}" style="background-color: #0073aa; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Visit Your Account</a>
+        </div>
+        <p>If you have any questions, please don\'t hesitate to contact us.</p>
+        <p>Thanks!</p>
+        <p>The {site_name} Team</p>
+    </div>
+    <div style="background-color: #f8f8f8; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        <p>{site_name} - {site_url}</p>
+    </div>
+</div>',
+        'password_reset' => '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+    <div style="background-color: #f8f8f8; padding: 20px; text-align: center;">
+        <h1 style="color: #0073aa; margin: 0;">Password Reset</h1>
+    </div>
+    <div style="padding: 20px;">
+        <p>Hello {customer_name},</p>
+        <p>Your password has been successfully reset.</p>
+        <p>If you did not request this change, please contact us immediately.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{site_url}" style="background-color: #0073aa; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Visit Your Account</a>
+        </div>
+        <p>Thanks!</p>
+        <p>The {site_name} Team</p>
+    </div>
+    <div style="background-color: #f8f8f8; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        <p>{site_name} - {site_url}</p>
+    </div>
+</div>',
+        'new_order' => '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+    <div style="background-color: #f8f8f8; padding: 20px; text-align: center;">
+        <h1 style="color: #0073aa; margin: 0;">Thank You for Your Order!</h1>
+    </div>
+    <div style="padding: 20px;">
+        <p>Hello {customer_name},</p>
+        <p>Your order #{order_id} has been received and is now being processed.</p>
+        <p>Order Total: {order_total}</p>
+        <p>We\'ll send you another email when your order has shipped.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{site_url}" style="background-color: #0073aa; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Track Your Order</a>
+        </div>
+        <p>Thanks for shopping with us!</p>
+        <p>The {site_name} Team</p>
+    </div>
+    <div style="background-color: #f8f8f8; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        <p>{site_name} - {site_url}</p>
+    </div>
+</div>',
+        'order_status' => '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+    <div style="background-color: #f8f8f8; padding: 20px; text-align: center;">
+        <h1 style="color: #0073aa; margin: 0;">Order Status Update</h1>
+    </div>
+    <div style="padding: 20px;">
+        <p>Hello {customer_name},</p>
+        <p>Your order #{order_id} status has been updated to: <strong>{order_status}</strong>.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{site_url}" style="background-color: #0073aa; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">View Order Details</a>
+        </div>
+        <p>If you have any questions, please contact us.</p>
+        <p>Thanks!</p>
+        <p>The {site_name} Team</p>
+    </div>
+    <div style="background-color: #f8f8f8; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        <p>{site_name} - {site_url}</p>
+    </div>
+</div>',
+        'abandoned_cart' => '<div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+    <div style="background-color: #f8f8f8; padding: 20px; text-align: center;">
+        <h1 style="color: #0073aa; margin: 0;">Complete Your Purchase</h1>
+    </div>
+    <div style="padding: 20px;">
+        <p>Hello {customer_name},</p>
+        <p>We noticed you left some items in your shopping cart. Would you like to complete your purchase?</p>
+        <p>Good news! We\'ve created a <strong>special discount</strong> just for you.</p>
+        <p>Use code: <strong style="background-color: #f1f1f1; padding: 5px 10px;">{coupon_code}</strong> to get 10% off your purchase.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{recovery_link}" style="background-color: #0073aa; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Complete Your Purchase</a>
+        </div>
+        <p>This offer is valid for 7 days, so don\'t miss out!</p>
+        <p>Thank you for shopping with us.</p>
+        <p>The {site_name} Team</p>
+    </div>
+    <div style="background-color: #f8f8f8; padding: 15px; text-align: center; font-size: 12px; color: #666;">
+        <p>{site_name} - {site_url}</p>
+    </div>
+</div>'
+    ];
+    
+    return $templates[$key] ?? '';
+}
+
+// Get default email subjects
+function wabot_get_default_email_subject($key) {
+    $subjects = [
+        'new_user' => 'Welcome to {site_name}!',
+        'password_reset' => 'Your Password Has Been Reset',
+        'new_order' => 'Thank You for Your Order #{order_id}',
+        'order_status' => 'Order #{order_id} Status Update: {order_status}',
+        'abandoned_cart' => 'Complete Your Purchase with a Special Discount'
+    ];
+    
+    return $subjects[$key] ?? '';
+}
+
+// Add preview modal HTML
+add_action('admin_footer', 'wabot_add_email_preview_modal');
+function wabot_add_email_preview_modal() {
+    if (isset($_GET['page']) && $_GET['page'] === 'wabot-settings' && isset($_GET['tab']) && $_GET['tab'] === 'email_settings') {
+        ?>
+        <div id="email-preview-modal" class="wabot-modal">
+            <div class="wabot-modal-content">
+                <div class="modal-header">
+                    <h2>Email Preview</h2>
+                    <button type="button" id="close-email-preview-modal" class="close-button">×</button>
+                </div>
+                <div class="wabot-form-body">
+                    <div id="email-preview-variables-container" style="margin-bottom: 20px;">
+                        <!-- Dynamic variables will be inserted here -->
+                    </div>
+                    <div class="preview-actions" style="margin-bottom: 20px;">
+                        <button type="button" id="refresh-email-preview" class="wabot-button">
+                            <span class="dashicons dashicons-update" style="margin-right: 5px;"></span> Refresh Preview
+                        </button>
+                    </div>
+                    <div id="email-preview-container" style="border: 1px solid #ddd; padding: 20px; background: #fff;">
+                        <div id="email-preview-subject" style="padding: 10px; background: #f5f5f5; margin-bottom: 10px; border-radius: 4px;">
+                            <!-- Subject will be inserted here -->
+                        </div>
+                        <div id="email-preview-content">
+                            <!-- Content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+}
+
+// Add this new function for the templates section callback
+function wabot_templates_section_callback() {
+    echo '<div style="margin-bottom: 20px;">';
+    echo '<button type="button" id="clear-template-cache-btn" class="wabot-button danger">';
+    echo '<span class="dashicons dashicons-trash" style="margin-right: 5px;"></span> Clear Template Cache';
+    echo '</button>';
+    echo '<span class="wabot-form-description" style="margin-left: 10px; display: inline-block;">';
+    echo 'Click to clear the cached WhatsApp templates and force reload from API.';
+    echo '</span>';
+    echo '</div>';
+}
+
+// Add this function to clear template cache
+function wabot_clear_template_cache() {
+    delete_transient('wabot_templates');
+    delete_transient('wabot_template_details');
+    wp_send_json_success(['message' => 'Template cache cleared.']);
+}
+add_action('wp_ajax_wabot_clear_template_cache', 'wabot_clear_template_cache');
+
