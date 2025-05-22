@@ -1008,7 +1008,11 @@ function wabot_enqueue_scripts() {
 
 add_action( 'wp_footer', 'wabot_modal_html' );
 function wabot_modal_html() {
-    if ( ! is_user_logged_in() ) {
+    // Check if guest modal is enabled
+    $options = get_option('wabot_settings_other', array());
+    $is_modal_enabled = isset($options['wabot_guest_modal_enabled']) ? $options['wabot_guest_modal_enabled'] : '1';
+
+    if (!is_user_logged_in() && $is_modal_enabled === '1') {
         ?>
         <div id="wabot-email-modal" style="display: none;">
             <div class="wabot-modal-content">

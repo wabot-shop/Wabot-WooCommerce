@@ -1526,3 +1526,12 @@ input[placeholder="param1=value1&param2=value2"] {
     border-radius: 6px;
     color: var(--wabot-text-light);
 }
+.wabot-period-selector .button {
+  margin-right: 5px;
+}
+.wabot-period-selector .button:last-child {
+  margin-right: 0;
+}
+.wabot-period-selector #dash-date-to {
+margin:0 5px;
+}

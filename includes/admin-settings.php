@@ -147,27 +147,38 @@ function wabot_settings_init() {
         )
     );
 
-        // Profile Settings Tab
-        register_setting( 'wabot_settings_profile_group', 'wabot_settings_profile' );
+    add_settings_field(
+        'wabot_guest_modal_enabled',
+        'Guest User Modal',
+        'wabot_guest_modal_enabled_render',
+        'wabot-settings-other',
+        'wabot_other_settings_section',
+        array(
+            'description' => 'Enable or disable the Wabot modal that appears for guest users to collect their contact information.',
+        )
+    );
 
-        add_settings_section(
-            'wabot_profile_section',
-            'Profile Settings',
-            null,
-            'wabot-settings-profile'
-        );
-    
-        add_settings_field(
-            'wabot_active_phone',
-            'Active Phone Number',
-            'wabot_active_phone_render',
-            'wabot-settings-profile',
-            'wabot_profile_section',
-            array(
-                'description' => 'Select the active phone number to be used for WhatsApp messages.',
-            )
-        );
-    
+    // Profile Settings Tab
+    register_setting( 'wabot_settings_profile_group', 'wabot_settings_profile' );
+
+    add_settings_section(
+        'wabot_profile_section',
+        'Profile Settings',
+        null,
+        'wabot-settings-profile'
+    );
+
+    add_settings_field(
+        'wabot_active_phone',
+        'Active Phone Number',
+        'wabot_active_phone_render',
+        'wabot-settings-profile',
+        'wabot_profile_section',
+        array(
+            'description' => 'Select the active phone number to be used for WhatsApp messages.',
+        )
+    );
+
     // Email Settings Tab
     register_setting( 
         'wabot_settings_email_group', 
@@ -286,7 +297,7 @@ function wabot_settings_redirect( $location, $status ) {
 // Settings page content with tabs
 function wabot_settings_page() {
     // Get current tab
-    $tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'credentials';
+    $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'integration';
     
     // Enqueue styles and scripts
     wp_enqueue_style('wabot-admin-style', plugin_dir_url(dirname(__FILE__)) . 'css/wabot-admin.css', array(), '1.0.0');
@@ -298,11 +309,21 @@ function wabot_settings_page() {
         'nonce' => wp_create_nonce('wabot_admin_nonce')
     ));
     
+    // Get integration type
+    $options = get_option('wabot_settings_credentials', array());
+    $integration_type = isset($options['wabot_integration_type']) ? $options['wabot_integration_type'] : 'rest_api';
+    
     // Get API credentials for status display
     $credentials = get_option('wabot_settings_credentials');
     $api_key = $credentials['wabot_api_key'] ?? '';
     $api_secret = $credentials['wabot_api_secret'] ?? '';
-    $connection_status = (!empty($api_key) && !empty($api_secret)) ? 'connected' : 'disconnected';
+    
+    // Set connection status based on integration type
+    if ($integration_type === 'webhook') {
+        $connection_status = 'webhook_connected';
+    } else {
+        $connection_status = (!empty($api_key) && !empty($api_secret)) ? 'connected' : 'disconnected';
+    }
     
     // Get stats
     $account = wabot_get_phonenumbers();
@@ -330,10 +351,10 @@ function wabot_settings_page() {
 
         <?php
         // Display any settings errors or success messages
-        if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
-            add_settings_error( 'wabot_messages', 'wabot_message', 'Settings Saved', 'updated' );
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated']) {
+            add_settings_error('wabot_messages', 'wabot_message', 'Settings Saved', 'updated');
         }
-        settings_errors( 'wabot_messages' );
+        settings_errors('wabot_messages');
         ?>
 
         <!-- Dashboard Stats -->
@@ -342,7 +363,18 @@ function wabot_settings_page() {
                 <h3>Connection Status</h3>
                 <div class="wabot-stats-value">
                     <span class="wabot-connection-status <?php echo $connection_status; ?>">
-                        <?php echo $connection_status === 'connected' ? 'Connected' : 'Disconnected'; ?>
+                        <?php 
+                        switch($connection_status) {
+                            case 'webhook_connected':
+                                echo 'Webhook Connected';
+                                break;
+                            case 'connected':
+                                echo 'Connected';
+                                break;
+                            default:
+                                echo 'Disconnected';
+                        }
+                        ?>
                     </span>
                 </div>
             </div>
@@ -365,93 +397,245 @@ function wabot_settings_page() {
 
         <!-- Tab Navigation -->
         <h2 class="wabot-nav-tab-wrapper">
-            <a href="?page=wabot-settings&tab=credentials" class="wabot-nav-tab nav-tab <?php echo $tab == 'credentials' ? 'nav-tab-active' : ''; ?>">Credentials</a>
-            <a href="?page=wabot-settings&tab=profile" class="wabot-nav-tab nav-tab <?php echo $tab == 'profile' ? 'nav-tab-active' : ''; ?>">Profile</a>
-            <a href="?page=wabot-settings&tab=templates" class="wabot-nav-tab nav-tab <?php echo $tab == 'templates' ? 'nav-tab-active' : ''; ?>">Templates</a>
+            <a href="?page=wabot-settings&tab=integration" class="wabot-nav-tab nav-tab <?php echo $tab == 'integration' ? 'nav-tab-active' : ''; ?>">Integration</a>
+            <?php if ($integration_type === 'rest_api'): ?>
+                <a href="?page=wabot-settings&tab=credentials" class="wabot-nav-tab nav-tab <?php echo $tab == 'credentials' ? 'nav-tab-active' : ''; ?>">Credentials</a>
+                <a href="?page=wabot-settings&tab=profile" class="wabot-nav-tab nav-tab <?php echo $tab == 'profile' ? 'nav-tab-active' : ''; ?>">Profile</a>
+                <a href="?page=wabot-settings&tab=templates" class="wabot-nav-tab nav-tab <?php echo $tab == 'templates' ? 'nav-tab-active' : ''; ?>">Templates</a>
+            <?php endif; ?>
             <a href="?page=wabot-settings&tab=email_settings" class="wabot-nav-tab nav-tab <?php echo $tab == 'email_settings' ? 'nav-tab-active' : ''; ?>">Email Settings</a>
             <a href="?page=wabot-settings&tab=other_settings" class="wabot-nav-tab nav-tab <?php echo $tab == 'other_settings' ? 'nav-tab-active' : ''; ?>">Settings</a>
         </h2>
 
         <div class="wabot-form-container">
-            <?php if ($tab == 'templates'): ?>
-                <div style="margin-bottom: 20px;">
-                    <button type="button" id="debug-templates-btn" class="wabot-button secondary">
-                        <span class="dashicons dashicons-code-standards" style="margin-right: 5px;"></span> Debug Templates
-                    </button>
-                    <span class="wabot-form-description" style="margin-left: 10px; display: inline-block;">
-                        Click to console log template data from API for debugging
-                    </span>
-                </div>
+            <?php if ($tab == 'integration'): ?>
+                <form action="options.php" method="post">
+                    <?php
+                    settings_fields('wabot_settings_credentials_group');
+                    ?>
+                    <div class="wabot-integration-cards">
+                        <div class="wabot-card <?php echo $integration_type === 'webhook' ? 'selected' : ''; ?>">
+                            <input type="radio" name="wabot_settings_credentials[wabot_integration_type]" value="webhook" id="webhook" <?php checked('webhook', $integration_type); ?>>
+                            <label for="webhook">
+                                <div class="card-header">
+                                    <h3>Webhook Integration</h3>
+                                    <span class="dashicons dashicons-admin-generic"></span>
+                                </div>
+                                <div class="card-body">
+                                    <p>Configure Workflows in app.wabot.shop to handle each events like:</p>
+                                    <ul>
+                                        <li>Order notifications</li>
+                                        <li>Contact management</li>
+                                        <li>Shipping updates</li>
+                                        <li>Abandoned cart recovery</li>
+                                    </ul>
+                                    <div class="webhook-info">
+                                        <p><strong>Webhook URL:</strong> </p>
+                                        <p class="webhook-note">This URL is automatically configured when you select Webhook integration.</p>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="wabot-card <?php echo $integration_type === 'rest_api' ? 'selected' : ''; ?>">
+                            <input type="radio" name="wabot_settings_credentials[wabot_integration_type]" value="rest_api" id="rest_api" <?php checked('rest_api', $integration_type); ?>>
+                            <label for="rest_api">
+                                <div class="card-header">
+                                    <h3>REST API Integration</h3>
+                                    <span class="dashicons dashicons-rest-api"></span>
+                                </div>
+                                <div class="card-body">
+                                    <p>Configure and select Templates from plugin settings by entering API credentials available under developer settings in wabot console.</p>
+                                    <ul>
+                                        <li>Direct template selection</li>
+                                        <li>Custom template variables</li>
+                                        <li>Real-time message delivery</li>
+                                        <li>Template management</li>
+                                    </ul>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <?php submit_button('Save Integration Settings'); ?>
+                </form>
+            <?php else: ?>
+                <!-- Existing tab content -->
+                <form action="options.php" method="post">
+                    <?php
+                    if ($tab == 'credentials') {
+                        settings_fields('wabot_settings_credentials_group');
+                        do_settings_sections('wabot-settings-credentials');
+                    } elseif ($tab == 'profile') {
+                        settings_fields('wabot_settings_profile_group');
+                        do_settings_sections('wabot-settings-profile');
+                    } elseif ($tab == 'templates') {
+                        settings_fields('wabot_settings_templates_group');
+                        do_settings_sections('wabot-settings-templates');
+                    } elseif ($tab == 'email_settings') {
+                        settings_fields('wabot_settings_email_group');
+                        do_settings_sections('wabot-settings-email');
+                    } elseif ($tab == 'other_settings') {
+                        settings_fields('wabot_settings_other_group');
+                        do_settings_sections('wabot-settings-other');
+                    }
+                    ?>
+                    <input type="hidden" name="tab" value="<?php echo esc_attr($tab); ?>" />
+                    <?php submit_button('Save Settings'); ?>
+                </form>
             <?php endif; ?>
-
-            <form action="options.php" method="post">
-                <?php
-                if ( $tab == 'credentials' ) {
-                    settings_fields( 'wabot_settings_credentials_group' );
-                    
-                    echo '<div class="wabot-form-section">';
-                    echo '<div class="wabot-form-header"><h2>API Credentials</h2></div>';
-                    echo '<div class="wabot-form-body">';
-                    do_settings_sections( 'wabot-settings-credentials' );
-                    echo '</div></div>';
-                    
-                } elseif ( $tab == 'profile' ) {
-                    settings_fields( 'wabot_settings_profile_group' );
-                    
-                    echo '<div class="wabot-form-section">';
-                    echo '<div class="wabot-form-header"><h2>Profile Settings</h2></div>';
-                    echo '<div class="wabot-form-body">';
-                    do_settings_sections( 'wabot-settings-profile' );
-                    echo '</div></div>';
-                    
-                } elseif ( $tab == 'templates' ) {
-                    settings_fields( 'wabot_settings_templates_group' );
-                    
-                    echo '<div class="wabot-form-section">';
-                    echo '<div class="wabot-form-header"><h2>WhatsApp Templates</h2></div>';
-                    echo '<div class="wabot-form-body">';
-                    do_settings_sections( 'wabot-settings-templates' );
-                    echo '</div></div>';
-                    
-                } elseif ( $tab == 'email_settings' ) {
-                    settings_fields( 'wabot_settings_email_group' );
-                    
-                    echo '<div class="wabot-form-section">';
-                    echo '<div class="wabot-form-header"><h2>Email Templates</h2></div>';
-                    echo '<div class="wabot-form-body">';
-                    do_settings_sections( 'wabot-settings-email' );
-                    echo '</div></div>';
-                    
-                } elseif ( $tab == 'other_settings' ) {
-                    settings_fields( 'wabot_settings_other_group' );
-                    
-                    echo '<div class="wabot-form-section">';
-                    echo '<div class="wabot-form-header"><h2>Other Settings</h2></div>';
-                    echo '<div class="wabot-form-body">';
-                    do_settings_sections( 'wabot-settings-other' );
-                    echo '</div></div>';
-                }
-
-                // Include the current tab in the form submission
-                echo '<input type="hidden" name="tab" value="' . esc_attr( $tab ) . '" />';
-
-                submit_button('Save Settings', 'wabot-button');
-                ?>
-            </form>
         </div>
     </div>
+
+    <style>
+    .wabot-integration-cards {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    .wabot-card {
+        flex: 1;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .wabot-card.selected {
+        border-color: #0073aa;
+        box-shadow: 0 0 10px rgba(0,115,170,0.2);
+    }
+
+    .wabot-card input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+
+    .wabot-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .wabot-card .card-header h3 {
+        margin: 0;
+        color: #23282d;
+    }
+
+    .wabot-card .card-body {
+        color: #666;
+    }
+
+    .wabot-card .card-body ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .wabot-card .card-body li {
+        margin: 5px 0;
+    }
+
+    .webhook-info {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+
+    .webhook-info code {
+        background: #f5f5f5;
+        padding: 3px 6px;
+        border-radius: 3px;
+        font-size: 13px;
+    }
+
+    .webhook-note {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    .wabot-connection-status {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .wabot-connection-status.connected {
+        background-color: #dff0d8;
+        color: #3c763d;
+    }
+
+    .wabot-connection-status.webhook_connected {
+        background-color: #d9edf7;
+        color: #31708f;
+    }
+
+    .wabot-connection-status.disconnected {
+        background-color: #f2dede;
+        color: #a94442;
+    }
+    </style>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Handle card selection
+        $('.wabot-card input[type="radio"]').on('change', function() {
+            $('.wabot-card').removeClass('selected');
+            $(this).closest('.wabot-card').addClass('selected');
+        });
+    });
+    </script>
     <?php
 }
 
 // Render functions for Credentials Tab
-function wabot_api_key_render( $args ) {
-    $options = get_option( 'wabot_settings_credentials' );
-    $description = isset( $args['description'] ) ? $args['description'] : '';
+function wabot_webhook_enabled_render($args) {
+    $options = get_option('wabot_settings_credentials', array());
+    $is_enabled = isset($options['wabot_webhook_enabled']) ? $options['wabot_webhook_enabled'] : '0';
+    $description = isset($args['description']) ? $args['description'] : '';
     ?>
     <div class="wabot-form-group">
-        <input type='text' class="regular-text" name='wabot_settings_credentials[wabot_api_key]' value='<?php echo esc_attr( $options['wabot_api_key'] ?? '' ); ?>' />
-        <?php if ( $description ) : ?>
-            <p class="wabot-form-description"><?php echo esc_html( $description ); ?></p>
+        <label class="wabot-toggle-switch">
+            <input type="hidden" name="wabot_settings_credentials[wabot_webhook_enabled]" value="0">
+            <input type="checkbox" name="wabot_settings_credentials[wabot_webhook_enabled]" value="1" <?php checked('1', $is_enabled); ?>>
+            <span class="wabot-toggle-slider"></span>
+        </label>
+        <?php if ($description) : ?>
+            <p class="wabot-form-description"><?php echo esc_html($description); ?></p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+function wabot_webhook_url_render($args) {
+    $options = get_option('wabot_settings_credentials', array());
+    $webhook_url = isset($options['wabot_webhook_url']) ? $options['wabot_webhook_url'] : 'https://woo.wabot.shop/webhook/';
+    $description = isset($args['description']) ? $args['description'] : '';
+    ?>
+    <div class="wabot-form-group">
+        <input type='url' class="regular-text" name='wabot_settings_credentials[wabot_webhook_url]' value='<?php echo esc_attr($webhook_url); ?>' />
+        <?php if ($description) : ?>
+            <p class="wabot-form-description"><?php echo esc_html($description); ?></p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+function wabot_api_key_render($args) {
+    $options = get_option('wabot_settings_credentials', array());
+    $is_webhook_enabled = isset($options['wabot_webhook_enabled']) ? $options['wabot_webhook_enabled'] : '0';
+    $description = isset($args['description']) ? $args['description'] : '';
+    ?>
+    <div class="wabot-form-group" id="api-credentials-group" style="<?php echo $is_webhook_enabled === '1' ? 'display: none;' : ''; ?>">
+        <input type='text' class="regular-text" name='wabot_settings_credentials[wabot_api_key]' value='<?php echo esc_attr($options['wabot_api_key'] ?? ''); ?>' />
+        <?php if ($description) : ?>
+            <p class="wabot-form-description"><?php echo esc_html($description); ?></p>
         <?php endif; ?>
     </div>
     <?php
@@ -1059,6 +1243,24 @@ function wabot_abandonment_time_render( $args ) {
     <?php
 }
 
+function wabot_guest_modal_enabled_render($args) {
+    $options = get_option('wabot_settings_other', array());
+    $is_enabled = isset($options['wabot_guest_modal_enabled']) ? $options['wabot_guest_modal_enabled'] : '1'; // Default to enabled
+    $description = isset($args['description']) ? $args['description'] : '';
+    ?>
+    <div class="wabot-form-group">
+        <label class="wabot-toggle-switch">
+            <input type="hidden" name="wabot_settings_other[wabot_guest_modal_enabled]" value="0">
+            <input type="checkbox" name="wabot_settings_other[wabot_guest_modal_enabled]" value="1" <?php checked('1', $is_enabled); ?>>
+            <span class="wabot-toggle-slider"></span>
+        </label>
+        <?php if ($description) : ?>
+            <p class="wabot-form-description"><?php echo esc_html($description); ?></p>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
 function wabot_send_message_ajax() {
     if ( ! isset( $_POST['to'], $_POST['template_name'] ) ) {
         wp_send_json_error( array( 'message' => 'Invalid parameters.' ) );
@@ -1625,4 +1827,161 @@ function wabot_clear_template_cache() {
     wp_send_json_success(['message' => 'Template cache cleared.']);
 }
 add_action('wp_ajax_wabot_clear_template_cache', 'wabot_clear_template_cache');
+
+// Add JavaScript to handle the toggle visibility
+add_action('admin_footer', 'wabot_webhook_toggle_script');
+function wabot_webhook_toggle_script() {
+    if (isset($_GET['page']) && $_GET['page'] === 'wabot-settings' && isset($_GET['tab']) && $_GET['tab'] === 'credentials') {
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            function toggleApiCredentials() {
+                var isWebhookEnabled = $('input[name="wabot_settings_credentials[wabot_webhook_enabled]"]').is(':checked');
+                $('#api-credentials-group').toggle(!isWebhookEnabled);
+            }
+
+            // Initial toggle
+            toggleApiCredentials();
+
+            // Toggle on change
+            $('input[name="wabot_settings_credentials[wabot_webhook_enabled]"]').on('change', toggleApiCredentials);
+        });
+        </script>
+        <?php
+    }
+}
+
+// Add the integration type render function
+function wabot_integration_type_render($args) {
+    $options = get_option('wabot_settings_credentials', array());
+    $integration_type = isset($options['wabot_integration_type']) ? $options['wabot_integration_type'] : 'rest_api';
+    ?>
+    <div class="wabot-integration-cards">
+        <div class="wabot-card <?php echo $integration_type === 'webhook' ? 'selected' : ''; ?>">
+            <input type="radio" name="wabot_settings_credentials[wabot_integration_type]" value="webhook" id="webhook" <?php checked('webhook', $integration_type); ?>>
+            <label for="webhook">
+                <div class="card-header">
+                    <h3>Webhook Integration</h3>
+                    <span class="dashicons dashicons-admin-generic"></span>
+                </div>
+                <div class="card-body">
+                    <p>Configure Workflows in app.wabot.shop to handle each events like:</p>
+                    <ul>
+                        <li>Order notifications</li>
+                        <li>Contact management</li>
+                        <li>Shipping updates</li>
+                        <li>Abandoned cart recovery</li>
+                    </ul>
+                    <div class="webhook-info">
+                        <p><strong>Webhook URL:</strong> <code>https://woo.wabot.shop/webhook/</code></p>
+                        <p class="webhook-note">This URL is automatically configured when you select Webhook integration.</p>
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <div class="wabot-card <?php echo $integration_type === 'rest_api' ? 'selected' : ''; ?>">
+            <input type="radio" name="wabot_settings_credentials[wabot_integration_type]" value="rest_api" id="rest_api" <?php checked('rest_api', $integration_type); ?>>
+            <label for="rest_api">
+                <div class="card-header">
+                    <h3>REST API Integration</h3>
+                    <span class="dashicons dashicons-rest-api"></span>
+                </div>
+                <div class="card-body">
+                    <p>Configure and select Templates from plugin settings by entering API credentials available under developer settings in wabot console.</p>
+                    <ul>
+                        <li>Direct template selection</li>
+                        <li>Custom template variables</li>
+                        <li>Real-time message delivery</li>
+                        <li>Template management</li>
+                    </ul>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <style>
+    .wabot-integration-cards {
+        display: flex;
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    .wabot-card {
+        flex: 1;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .wabot-card.selected {
+        border-color: #0073aa;
+        box-shadow: 0 0 10px rgba(0,115,170,0.2);
+    }
+
+    .wabot-card input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+
+    .wabot-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .wabot-card .card-header h3 {
+        margin: 0;
+        color: #23282d;
+    }
+
+    .wabot-card .card-body {
+        color: #666;
+    }
+
+    .wabot-card .card-body ul {
+        margin: 10px 0;
+        padding-left: 20px;
+    }
+
+    .wabot-card .card-body li {
+        margin: 5px 0;
+    }
+
+    .webhook-info {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+
+    .webhook-info code {
+        background: #f5f5f5;
+        padding: 3px 6px;
+        border-radius: 3px;
+        font-size: 13px;
+    }
+
+    .webhook-note {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+        font-style: italic;
+    }
+    </style>
+
+    <script>
+    jQuery(document).ready(function($) {
+        // Handle card selection
+        $('.wabot-card input[type="radio"]').on('change', function() {
+            $('.wabot-card').removeClass('selected');
+            $(this).closest('.wabot-card').addClass('selected');
+        });
+    });
+    </script>
+    <?php
+}
 
